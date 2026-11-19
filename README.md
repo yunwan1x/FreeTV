@@ -8,6 +8,12 @@
 
 「线路」可以检测当前频道或手动换线。内置检测最多同时发起 6 个请求，读取响应开头识别 HLS。地址可达与播放器实际起播分别记录，启动失败会依次尝试本频道的备用线路。上次实际起播成功的地址优先。打开「频道订阅」可刷新列表并后台批量检测，也可中止检测。播放依赖本地网络、区域限制以及系统 WebView 的媒体解码能力。支持 HLS 和 WebView 能解码的直接媒体文件。
 
+### 单条线路深度检测
+
+打开「线路」，在目标线路旁点「深度检测」。Windows、macOS 和 Linux 自动在 PATH 中查找 FFmpeg，macOS 也检查 Homebrew 常用安装目录。可点「选择程序」指定本机的 ffmpeg 或 ffmpeg.exe，选择会保存在本机。「恢复自动查找」会清除该选择。安装包不附带 FFmpeg，未安装时仍可快速检测和看电视。
+
+Android 使用独立的静音播放器试播所选线路，取得第一帧后立即结束。桌面和手机都设置了 15 秒超时，结果显示在所选线路下方。深度检测只按需运行，不参与批量扫描。
+
 ## 启动与打包
 
 安装 Node.js 22.12+、Rust stable，以及目标平台的 [Tauri 2 系统依赖](https://v2.tauri.app/start/prerequisites/)。Linux 运行时需要 WebKitGTK 4.1 和支持 H.264/AAC 的 GStreamer 插件。
@@ -34,6 +40,6 @@ Android 需配置 JDK、Android SDK/NDK 和 Rust Android target。运行 `npm ru
 
 - [Free-TV/IPTV](https://github.com/Free-TV/IPTV) 提供全球播放列表。
 - [best-fan/iptv-sources](https://github.com/best-fan/iptv-sources) 提供央视与卫视播放列表。
-- 检测逻辑适配自 [zhimin-dev/iptv-checker-rs](https://github.com/zhimin-dev/iptv-checker-rs/tree/b1febd5d5464a26ca6f476e16d4ecea76f063e84) 的 HLS 预检和格式识别，保留 [MIT 许可](licenses/iptv-checker-rs.txt)。客户端使用异步 Rust 网络请求，不需要另行部署 Docker。检测不包含 FFmpeg 解码探测。
+- 检测逻辑适配自 [zhimin-dev/iptv-checker-rs](https://github.com/zhimin-dev/iptv-checker-rs/tree/b1febd5d5464a26ca6f476e16d4ecea76f063e84) 的 HLS 预检和格式识别，保留 [MIT 许可](licenses/iptv-checker-rs.txt)。客户端使用异步 Rust 网络请求，不需要另行部署 Docker。桌面端的可选首帧解码检测调用本机 FFmpeg。
 - [EPG.PW](https://epg.pw/) 提供地区 XMLTV 数据。节目覆盖和更新时间取决于来源。
 - 封面照片来自 [Unsplash](https://images.unsplash.com/photo-1508804185872-d7badad00f7d)。实际直播画面由用户选择的上游提供。

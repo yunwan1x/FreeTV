@@ -1,5 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { Player } from "./player.js";
+import { Player, previewFirstFrame } from "./player.js";
 import checkerNotice from "../licenses/iptv-checker-rs.txt?raw";
 import hlsNotice from "../node_modules/hls.js/LICENSE?raw";
 import apacheLicense from "../node_modules/@tauri-apps/api/LICENSE-APACHE-2.0?raw";
@@ -320,12 +320,72 @@ function dialog(type, html) {
   $("dialogBody").innerHTML = html;
   if (!$("dialog").open) $("dialog").showModal();
 }
+let deepBackend,
+  testingUrl,
+  previewController,
+  pickerMessage = "";
+let ffmpegPath = read("ffmpeg-path", null);
+const deepResults = new Map();
+async function checkFirstFrame(url) {
+  if (testingUrl || !url || !deepBackend) return;
+  testingUrl = url;
+  deepResults.delete(url);
+  renderRouteModal();
+  const start = performance.now();
+  try {
+    if (deepBackend === "player") {
+      previewController = new AbortController();
+      await previewFirstFrame(url, $("dialog"), previewController.signal);
+    } else {
+      await invoke("decode_route", { url, path: ffmpegPath });
+    }
+    const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+    deepResults.set(url, "已解码首帧 · " + elapsed + " 秒");
+  } catch (error) {
+    deepResults.set(
+      url,
+      error instanceof Error ? error.message : String(error),
+    );
+  } finally {
+    testingUrl = null;
+    previewController = null;
+    renderRouteModal();
+  }
+}
+
+async function chooseFFmpeg() {
+  pickerMessage = "";
+  try {
+    const path = await invoke("choose_ffmpeg");
+    if (path) {
+      ffmpegPath = path;
+      write("ffmpeg-path", path);
+    }
+  } catch (error) {
+    pickerMessage = String(error);
+  }
+  renderRouteModal();
+}
+function deepSettings() {
+  if (deepBackend === "player")
+    return "<small>深度检测将静音试播所选线路，最多 15 秒。</small>";
+  if (deepBackend !== "ffmpeg") return "";
+  return (
+    '<div class="probe-settings"><small>FFmpeg · ' +
+    escape(ffmpegPath || "自动查找") +
+    "</small>" +
+    action("chooseFFmpeg", "选择程序", "textbtn") +
+    (ffmpegPath ? action("autoFFmpeg", "恢复自动查找", "textbtn") : "") +
+    (pickerMessage ? "<small>" + escape(pickerMessage) + "</small>" : "") +
+    "</div>"
+  );
+}
 function renderRouteModal() {
   if (dialogType !== "routes" || !current) return;
   const rows = current.routes
     .map((url, i) => {
       const result = health.get(url);
-      return action(
+      const routeButton = action(
         "route",
         "线路 " +
           (i + 1) +
@@ -343,11 +403,34 @@ function renderRouteModal() {
         "detail",
         i,
       );
+      const message =
+        testingUrl === url ? "正在验证首帧…" : deepResults.get(url);
+      const deepButton = deepBackend
+        ? '<button class="outline" data-act="deep" data-i="' +
+          i +
+          '"' +
+          (testingUrl ? " disabled" : "") +
+          ">深度检测</button>"
+        : "";
+      return (
+        '<div class="probe-row">' +
+        routeButton +
+        deepButton +
+        (message
+          ? '<small role="status">' + escape(message) + "</small>"
+          : "") +
+        "</div>"
+      );
     })
     .join("");
   dialog(
     "routes",
-    "<h2>" + escape(current.name) + " · 线路</h2>" + scanControl() + rows,
+    "<h2>" +
+      escape(current.name) +
+      " · 线路</h2>" +
+      scanControl() +
+      deepSettings() +
+      rows,
   );
 }
 function scanControl() {
@@ -462,6 +545,7 @@ $("notices").onclick = () =>
         .join(""),
   );
 $("dialog").onclose = () => {
+  previewController?.abort();
   dialogType = "";
 };
 $("close").onclick = () => $("dialog").close();
@@ -472,6 +556,13 @@ $("manage").onclick = () => {
 $("routes").onclick = () => {
   dialogType = "routes";
   renderRouteModal();
+  if (!deepBackend)
+    invoke("deep_check_backend")
+      .then((mode) => {
+        deepBackend = mode;
+        renderRouteModal();
+      })
+      .catch((error) => status(String(error)));
 };
 $("home").onclick = () => {
   favoritesOnly = false;
@@ -528,6 +619,18 @@ document.addEventListener("click", (e) => {
     case "route":
       $("dialog").close();
       play(current.routes[Number(i)]);
+      break;
+    case "deep":
+      checkFirstFrame(current.routes[Number(i)]);
+      break;
+    case "chooseFFmpeg":
+      chooseFFmpeg();
+      break;
+    case "autoFFmpeg":
+      ffmpegPath = null;
+      write("ffmpeg-path", null);
+      pickerMessage = "";
+      renderRouteModal();
       break;
     case "checkChannel":
       scan(current.routes, current.name);

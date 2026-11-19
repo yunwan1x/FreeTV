@@ -1,3 +1,4 @@
+mod deep_check;
 use freetv_core::{catalog, checker, guide, network};
 use std::{
     collections::HashMap,
@@ -108,6 +109,11 @@ pub fn run() {
             probes: Semaphore::new(6),
         })
         .invoke_handler(tauri::generate_handler![
+            deep_check::deep_check_backend,
+            #[cfg(desktop)]
+            deep_check::choose_ffmpeg,
+            #[cfg(desktop)]
+            deep_check::decode_route,
             subscription,
             probe_route,
             programmes,

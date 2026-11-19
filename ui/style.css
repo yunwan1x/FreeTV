@@ -906,3 +906,34 @@ footer button {
   cursor: pointer;
   padding: 6px 0;
 }
+.probe-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  border-top: 1px solid #e5e1da;
+  padding: 5px 0;
+}
+.probe-row .detail {
+  border: 0;
+}
+.probe-row > small {
+  grid-column: 1/-1;
+  overflow-wrap: anywhere;
+}
+.probe-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.probe-settings small {
+  overflow-wrap: anywhere;
+}
+.probe-preview {
+  display: block;
+  width: 120px;
+  aspect-ratio: 16/9;
+  background: #141414;
+  object-fit: contain;
+}
