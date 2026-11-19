@@ -9,6 +9,7 @@ import android.webkit.WebView
 import android.content.ComponentName
 import android.net.Uri
 import android.os.Bundle
+import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -60,6 +61,7 @@ class RadioPlugin(private val activity: Activity) : Plugin(activity) {
 
     override fun load(webView: WebView) {
         view = webView
+        fitSystemBars(activity.findViewById<ViewGroup>(android.R.id.content))
         (activity as AppCompatActivity).onBackPressedDispatcher.addCallback(activity, fullscreenBack)
         (activity as AppCompatActivity).addOnPictureInPictureModeChangedListener { info ->
             val event = if (info.isInPictureInPictureMode) "freetv-pip-enter" else "freetv-pip-exit"

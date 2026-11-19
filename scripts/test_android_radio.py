@@ -7,6 +7,7 @@ import shutil
 import threading
 import time
 import wave
+import xml.etree.ElementTree as ET
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,6 +22,22 @@ PACKAGE = "app.freetv.player"
 
 def adb(*args):
     return subprocess.check_output(["adb", *args], text=True, timeout=30).strip()
+
+
+def check_status_bar_clearance():
+    # The API 35 emulator runs this test in portrait with a visible status bar.
+    display = adb("shell", "dumpsys", "window", "displays")
+    bar = re.search(
+        r"(?:mType|type)=statusBars\b[^\n]*?(?:mFrame|frame)=\[0,0\]\[\d+,(\d+)\]",
+        display,
+    )
+    assert bar and int(bar[1]) > 0, "Could not measure the Android status bar"
+    adb("shell", "uiautomator", "dump", "/data/local/tmp/freetv-layout.xml")
+    tree = ET.fromstring(adb("shell", "cat", "/data/local/tmp/freetv-layout.xml"))
+    viewport = tree.find(".//node[@class='android.webkit.WebView']")
+    assert viewport is not None, "FreeTV WebView missing from the native view tree"
+    bounds = re.match(r"\[\d+,(\d+)\]", viewport.attrib["bounds"])
+    assert bounds and int(bounds[1]) >= int(bar[1]), (viewport.attrib["bounds"], bar[0])
 
 
 class PageTransition(Exception):
@@ -129,6 +146,7 @@ def test(folder):
     except AssertionError:
         print("Fixture state:", evaluate("[location.href,document.readyState,window.__fixture,document.body?.innerText.slice(0,600)]"), file=sys.stderr)
         raise
+    check_status_bar_clearance()
     print("Test page ready:", evaluate("[location.href,document.querySelector('#now')?.innerText,localStorage.getItem('lastChannel')]"), flush=True)
     evaluate("document.querySelector('#manage').click();document.querySelector('#dialog [data-act=proxy]').click()")
     wait(lambda: evaluate("document.querySelector('#proxyForm [type=submit]')?.disabled===false"))
@@ -179,6 +197,7 @@ def test(folder):
     wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
     wait(lambda: evaluate("!document.body.classList.contains('cinema-mode')"))
+    check_status_bar_clearance()
     print("Verified Android fullscreen and system Back.", flush=True)
     evaluate("document.querySelector('#pip').click()")
     def pinned():

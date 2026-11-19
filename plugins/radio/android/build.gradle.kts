@@ -19,6 +19,8 @@ android {
 kotlin { compilerOptions { jvmTarget = JvmTarget.JVM_1_8 } }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation(project(":tauri-android"))
     val media3 = "1.6.1"
