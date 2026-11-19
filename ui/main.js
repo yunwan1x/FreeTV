@@ -78,11 +78,7 @@ let catalog = [],
   favoritesOnly = false,
   query = "",
   limit = 75;
-let shows = [],
-  guideMessage = "",
-  guideVersion = 0,
-  dialogType = "",
-  visibleShows = [];
+let dialogType = "";
 let scanVersion = 0,
   scanning = false,
   scanDone = 0,
@@ -100,10 +96,7 @@ const wall = createWall({
   onFocus(tile) {
     current = tile.channel;
     $("now").textContent = current?.name || "从频道列表选择此画面的频道";
-    $("schedule").disabled =
-      $("save").disabled =
-      $("routes").disabled =
-        !current;
+    $("save").disabled = $("routes").disabled = !current;
     drawFavorite();
     drawList();
     updateStatus(tile);
@@ -119,6 +112,9 @@ const wall = createWall({
   },
 });
 function updateStatus(tile) {
+  const pause = $("videoToggle");
+  pause.disabled = !tile.channel;
+  pause.textContent = tile.url && !tile.video.paused ? "暂停" : "播放";
   status(tile.message);
   $("pip").disabled = !tile.url || tile.video.readyState < 2;
   renderRouteModal();
@@ -318,7 +314,7 @@ function select(c, start = true) {
   }
   write("lastChannel", c.id);
   $("now").textContent = c.name;
-  $("schedule").disabled = $("save").disabled = $("routes").disabled = false;
+  $("save").disabled = $("routes").disabled = false;
   updateStatus(wall.focused);
   drawFavorite();
   drawTabs();
@@ -332,66 +328,6 @@ function drawFavorite() {
   }
   $("save").textContent = favorites.has(current.id) ? "★ 已收藏" : "☆ 收藏";
   $("save").classList.toggle("on", favorites.has(current.id));
-}
-async function loadGuide(c) {
-  const version = ++guideVersion;
-  shows = [];
-  guideMessage = "正在获取节目单…";
-  drawGuide();
-  try {
-    const result = await invoke("programmes", {
-      region: c.countries.find((code) => code !== "?") || c.region,
-      name: c.name,
-      id: c.epg_id,
-    });
-    if (version !== guideVersion) return;
-    shows = result;
-    guideMessage = "该频道暂无节目预告";
-  } catch {
-    if (version !== guideVersion) return;
-    guideMessage = "节目单暂不可用";
-  }
-  drawGuide();
-}
-function clock(t) {
-  return new Date(t * 1000).toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
-function drawGuide() {
-  if (dialogType !== "guide" || !current) return;
-  const now = Date.now() / 1000;
-  visibleShows = shows.filter((s) => s.stop > now).slice(0, 4);
-  const content =
-    visibleShows
-      .map((s, i) =>
-        action(
-          "show",
-          "<time>" +
-            clock(s.start) +
-            "</time><small>" +
-            (s.start <= now ? "正在播出" : "即将播出") +
-            "</small><b>" +
-            escape(s.title) +
-            "</b>",
-          "slot " + (s.start <= now ? "live" : ""),
-          i,
-        ),
-      )
-      .join("") ||
-    '<p class="empty">' +
-      escape(guideMessage || "选择频道后查看节目单") +
-      "</p>";
-  dialog(
-    "guide",
-    "<h2>" +
-      escape(current.name) +
-      " · 节目单</h2><div class='guide-list'>" +
-      content +
-      "</div>",
-  );
 }
 function dialog(type, html) {
   dialogType = type;
@@ -697,11 +633,6 @@ $("favorites").onclick = () => {
   drawTabs();
   drawList();
 };
-$("schedule").onclick = () => {
-  if (!current) return;
-  dialogType = "guide";
-  loadGuide(current);
-};
 $("save").onclick = () => {
   if (!current) return;
   if (favorites.has(current.id)) favorites.delete(current.id);
@@ -729,6 +660,14 @@ $("dialogBody").addEventListener("change", (event) => {
     write("auto-sync", autoSync);
   }
 });
+$("videoToggle").onclick = () => {
+  const tile = wall.focused;
+  if (!tile.channel) return;
+  if (!tile.url) play();
+  else if (tile.video.paused)
+    tile.video.play().catch((error) => status(String(error)));
+  else tile.video.pause();
+};
 $("layouts").onclick = (event) => {
   const button = event.target.closest("button[data-layout]");
   if (button) wall.layout(Number(button.dataset.layout));
@@ -791,24 +730,6 @@ document.addEventListener("click", (e) => {
     case "refresh":
       refresh();
       break;
-    case "show": {
-      const s = visibleShows[Number(i)];
-      dialog(
-        "show",
-        "<h2>" +
-          escape(s.title) +
-          "</h2><p>" +
-          escape(current.name) +
-          " · " +
-          new Date(s.start * 1000).toLocaleDateString("zh-CN") +
-          " " +
-          clock(s.start) +
-          " — " +
-          clock(s.stop) +
-          "</p>",
-      );
-      break;
-    }
   }
 });
 wall.layout(1);

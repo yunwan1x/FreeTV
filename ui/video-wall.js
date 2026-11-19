@@ -9,6 +9,8 @@ export function createWall({
 }) {
   const wall = document.getElementById("wall");
   const tiles = [];
+  const narrow = matchMedia("(max-width:760px)");
+  narrow.addEventListener("change", () => tiles.forEach(draw));
   let focused;
   function createTile() {
     const node = document
@@ -61,6 +63,9 @@ export function createWall({
       draw(tile);
       if (start && channel) tile.player.play(playRoutes(channel));
     };
+    video.addEventListener("pause", () => {
+      if (tile.url && video.paused && !video.ended) report("已暂停");
+    });
     video.addEventListener("loadeddata", () => {
       if (tile === focused) onStatus(tile);
     });
@@ -81,6 +86,7 @@ export function createWall({
     const number = tiles.indexOf(tile) + 1;
     const { channel, node, tag } = tile;
     const active = tile === focused;
+    tile.video.controls = !(tiles.length > 1 && narrow.matches);
     node.classList.toggle("selected", active);
     node.classList.toggle("vacant", !channel);
     tag.setAttribute("aria-pressed", String(active));

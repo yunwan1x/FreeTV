@@ -1,16 +1,10 @@
 mod deep_check;
-use freetv_core::{catalog, checker, guide, network};
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use freetv_core::{catalog, checker, network};
 use tauri::State;
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::Semaphore;
 
 struct Engine {
     client: reqwest::Client,
-    guides: Mutex<HashMap<String, Arc<Mutex<Option<(Instant, guide::Guide)>>>>>,
     probes: Semaphore,
 }
 
@@ -43,34 +37,6 @@ async fn subscription(
 async fn probe_route(url: String, engine: State<'_, Engine>) -> Result<checker::Probe, String> {
     let _permit = engine.probes.acquire().await.map_err(|_| "检测已结束")?;
     Ok(checker::probe(&engine.client, url).await)
-}
-
-#[tauri::command]
-async fn programmes(
-    region: String,
-    name: String,
-    id: String,
-    engine: State<'_, Engine>,
-) -> Result<Vec<guide::Show>, String> {
-    let cell = engine
-        .guides
-        .lock()
-        .await
-        .entry(region.clone())
-        .or_default()
-        .clone();
-    let mut guide = cell.lock().await;
-    if !guide
-        .as_ref()
-        .is_some_and(|(time, _)| time.elapsed() < Duration::from_secs(4 * 3600))
-    {
-        match guide::load(&engine.client, &region).await {
-            Ok(fresh) => *guide = Some((Instant::now(), fresh)),
-            Err(e) if guide.is_none() => return Err(e),
-            Err(_) => {}
-        }
-    }
-    Ok(guide.as_ref().unwrap().1.find(&name, &id))
 }
 
 // Prefix the binary payload with the final URL so relative HLS segments resolve after redirects.
@@ -125,7 +91,6 @@ pub fn run() {
     builder
         .manage(Engine {
             client,
-            guides: Mutex::default(),
             probes: Semaphore::new(6),
         })
         .invoke_handler(tauri::generate_handler![
@@ -138,7 +103,6 @@ pub fn run() {
             native_radio,
             subscription,
             probe_route,
-            programmes,
             media
         ])
         .run(tauri::generate_context!())
