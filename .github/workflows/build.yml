@@ -56,6 +56,19 @@ jobs:
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
       - name: Generate native project and build APK
         run: |
+          # buildSrc resolves the Kotlin DSL plugin through the Plugin Portal.
+          # Resolve its published Kotlin libraries directly from Maven Central.
+          mkdir -p "$HOME/.gradle/init.d"
+          cat > "$HOME/.gradle/init.d/freetv-buildsrc.gradle" <<'GRADLE'
+          beforeSettings { settings ->
+              if (settings.settingsDir.name == 'buildSrc') {
+                  settings.pluginManagement.repositories {
+                      mavenCentral()
+                      gradlePluginPortal()
+                  }
+              }
+          }
+          GRADLE
           npm run tauri -- android init --ci --skip-targets-install
           npm run tauri -- icon assets/icon.svg
           npm run tauri -- android build --ci --apk --target aarch64
