@@ -1,6 +1,11 @@
 package app.freetv.radio
 
 import android.app.Activity
+import android.app.PictureInPictureParams
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Rational
+import android.webkit.WebView
 import android.content.ComponentName
 import android.net.Uri
 import android.os.Bundle
@@ -22,6 +27,37 @@ import com.google.common.util.concurrent.ListenableFuture
 class RadioPlugin(private val activity: Activity) : Plugin(activity) {
     private var connection: ListenableFuture<MediaController>? = null
     private val executor = ContextCompat.getMainExecutor(activity)
+
+    private var view: WebView? = null
+
+    override fun load(webView: WebView) {
+        view = webView
+        (activity as AppCompatActivity).addOnPictureInPictureModeChangedListener { info ->
+            val event = if (info.isInPictureInPictureMode) "freetv-pip-enter" else "freetv-pip-exit"
+            if (info.isInPictureInPictureMode) webView.onResume()
+            webView.evaluateJavascript("window.dispatchEvent(new Event('$event'))", null)
+        }
+    }
+
+    override fun onPause(activity: AppCompatActivity) {
+        if (Build.VERSION.SDK_INT >= 26 && activity.isInPictureInPictureMode) view?.onResume()
+    }
+
+    @Command
+    fun pip(invoke: Invoke) {
+        activity.runOnUiThread {
+            try {
+                if (Build.VERSION.SDK_INT < 26 ||
+                    !activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) {
+                    invoke.reject("此设备不支持系统画中画")
+                } else {
+                    val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()
+                    if (activity.enterPictureInPictureMode(params)) invoke.resolve()
+                    else invoke.reject("请在系统设置中允许 FreeTV 使用画中画")
+                }
+            } catch (e: Exception) { invoke.reject("系统拒绝进入画中画", e) }
+        }
+    }
 
     private fun withPlayer(invoke: Invoke, action: (MediaController) -> Unit) {
         activity.runOnUiThread {

@@ -1058,3 +1058,187 @@ footer button {
 .source-feed {
   margin-top: 8px;
 }
+
+.watch-tools,
+.layout-picker {
+  display: flex;
+  align-items: center;
+}
+.watch-tools {
+  justify-content: space-between;
+  margin: 0 0 12px;
+}
+.layout-picker {
+  background: #eae9e5;
+  border-radius: 9px;
+  padding: 3px;
+  gap: 3px;
+}
+.layout-picker button {
+  color: #615e58;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 7px;
+}
+.layout-picker [aria-pressed="true"] {
+  color: #241f1b;
+  background: #fff;
+  box-shadow: 0 1px 3px #28231c24;
+}
+.wall {
+  align-self: stretch;
+  display: grid;
+  background: #111313;
+  gap: 4px;
+  min-width: 0;
+  align-content: center;
+}
+.wall[data-layout="2"],
+.wall[data-layout="4"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.screen {
+  isolation: isolate;
+  position: relative;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  min-width: 0;
+  background: #111313;
+}
+.screen video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+.screen .cover {
+  padding: 6%;
+}
+.screen.vacant .cover {
+  background: #282b2c;
+  align-items: center;
+  justify-content: center;
+}
+.screen.vacant h2 {
+  display: none;
+}
+.screen.vacant .stamp {
+  align-self: center;
+  border: none;
+  background: transparent;
+  color: #b9bcb9;
+}
+.screen-play {
+  min-height: 32px;
+}
+.wall:not([data-layout="1"]) .cover h2 {
+  font-size: clamp(15px, 2.3vw, 30px);
+}
+.wall:not([data-layout="1"]) .selected::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border: 2px solid #ff816a;
+}
+.screen-tag {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 6px;
+  padding: 4px 8px;
+  max-width: calc(100% - 12px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #151817d9;
+  color: #eeefed;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.wall[data-layout="1"] .screen-tag {
+  display: none;
+}
+.wall[data-layout="2"] {
+  min-height: min(34vw, 460px);
+}
+.guide-list .slot {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #e7e3df;
+}
+.chipline {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.pip-mode {
+  overflow: hidden;
+  background: #111;
+}
+.pip-mode header,
+.pip-mode #tvPage > :not(.stage):not(#restorePip),
+.pip-mode .chanbox,
+.pip-mode .screen:not(.selected),
+.pip-mode .screen-tag,
+.pip-mode .screen.selected::after {
+  display: none;
+}
+.pip-mode #tvPage,
+.pip-mode .stage,
+.pip-mode .wall,
+.pip-mode .screen.selected {
+  border-radius: 0;
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  min-height: 0;
+}
+#restorePip {
+  position: fixed;
+  right: 7px;
+  top: 7px;
+  z-index: 5;
+}
+@media (max-width: 760px) {
+  .wall {
+    width: 100%;
+  }
+  .wall[data-layout="2"] {
+    min-height: 0;
+  }
+  .screen-tag {
+    font-size: 10px;
+    padding: 3px 5px;
+    top: 3px;
+    left: 3px;
+  }
+  .wall:not([data-layout="1"]) .cover .stamp {
+    display: none;
+  }
+  .wall:not([data-layout="1"]) .screen-play {
+    font-size: 11px;
+    padding: 4px 8px;
+    min-height: 25px;
+  }
+  .watch-tools {
+    margin-bottom: 8px;
+  }
+  .below {
+    flex-wrap: wrap;
+  }
+  .chanlist {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 245px;
+    height: auto;
+    flex: auto;
+    overflow: auto;
+  }
+  .channel {
+    min-width: 0;
+  }
+  .pip-mode .stage {
+    display: block;
+  }
+}

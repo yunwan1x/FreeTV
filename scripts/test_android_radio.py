@@ -3,6 +3,7 @@ import json
 import re
 import subprocess
 import sys
+import shutil
 import threading
 import time
 import wave
@@ -71,7 +72,7 @@ def test(folder):
         nonlocal sequence
         sequence += 1
         ws.send(json.dumps({"id": sequence, "method": "Runtime.evaluate",
-                            "params": {"expression": expression, "returnByValue": True}}))
+                            "params": {"expression": expression, "returnByValue": True, "userGesture": True}}))
         while True:
             message = json.loads(ws.recv())
             if message.get("id") == sequence:
@@ -81,13 +82,28 @@ def test(folder):
                 return result["result"].get("value")
     station = {"stationuuid":"screen-off-test","name":"Screen-off test","countrycode":"GB",
                "url":"http://127.0.0.1:8791/radio.wav","url_resolved":"","hls":0,"codec":"PCM","language":""}
-    evaluate("localStorage.setItem('radio-favorites', " + json.dumps(json.dumps([[station["stationuuid"],station]])) + ");location.reload()")
-    time.sleep(1)
-    wait(lambda: evaluate("!!document.querySelector('#radioNav')"))
+    wait(lambda: evaluate("!!document.querySelector('#radioNav')?.onclick"))
+    clip = Path(folder) / "test.m3u8"
+    subprocess.run([shutil.which("ffmpeg") or "ffmpeg", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "testsrc2=size=256x144:rate=10", "-t", "90",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-g", "20",
+                    "-hls_time", "2", "-hls_list_size", "0", str(clip)], check=True)
+    channel = {"id": "pip-test", "name": "PiP test", "group": "央视", "region": "CN",
+               "logo": "", "epg_id": "", "routes": ["http://127.0.0.1:8791/test.m3u8"]}
+    seed = {"radio-favorites": [[station["stationuuid"], station]],
+            **{f"feed-{i}": {"channels": [channel] if i == 0 else [],
+                             "updated": int(time.time() * 1000)} for i in range(3)}}
+    evaluate("for(const [k,v] of Object.entries(" + json.dumps(seed) +
+             ")) localStorage.setItem(k,JSON.stringify(v));location.reload()")
+    wait(lambda: evaluate("document.querySelector('.screen h2')?.textContent==='PiP test'"))
     evaluate("document.querySelector('#radioNav').click();document.querySelector('#radioFavs').click()")
     wait(lambda: evaluate("!!document.querySelector('.radio-station')"))
     evaluate("document.querySelector('.radio-station').click()")
-    wait(is_playing)
+    try:
+        wait(is_playing)
+    except AssertionError:
+        print("Radio status:", evaluate("document.querySelector('#radioStatus').innerText"), file=sys.stderr)
+        raise
     adb("shell", "input", "keyevent", "KEYCODE_SLEEP")
     wait(lambda: "mWakefulness=Asleep" in adb("shell", "dumpsys", "power"))
     time.sleep(12)
@@ -99,6 +115,17 @@ def test(folder):
     adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PLAY")
     wait(is_playing)
     print("Verified native playback, foreground service, screen-off playback and media-key pause/resume.")
+    adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+    adb("shell", "wm", "dismiss-keyguard")
+    evaluate("document.querySelector('#home').click();document.querySelector('.screen-play').click()")
+    wait(lambda: evaluate("document.querySelector('.screen video').currentTime > 1"))
+    evaluate("document.querySelector('#pip').click()")
+    def pinned():
+        return re.search(r"mode=pinned[^\n]*", adb("shell", "dumpsys", "activity", "activities")) is not None
+    wait(pinned)
+    start = evaluate("document.querySelector('.screen video').currentTime")
+    wait(lambda: evaluate("document.querySelector('.screen video').currentTime") > start + 2)
+    print("Verified Android system PiP with advancing video.")
     ws.close()
     server.shutdown()
 

@@ -136,8 +136,9 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+          command -v ffmpeg || sudo apt-get install -y ffmpeg
           python -m pip install --target "$RUNNER_TEMP/radio-test-python" websocket-client
-      - name: Verify screen-off playback and system controls
+      - name: Verify screen-off radio, system controls and TV picture in picture
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35

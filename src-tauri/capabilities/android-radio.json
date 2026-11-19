@@ -6,6 +6,7 @@
   "permissions": [
     "radio:allow-start",
     "radio:allow-control",
-    "radio:allow-status"
+    "radio:allow-status",
+    "radio:allow-pip"
   ]
 }

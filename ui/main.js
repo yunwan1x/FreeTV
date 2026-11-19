@@ -1,6 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setupRadio } from "./radio.js";
-import { Player, previewFirstFrame } from "./player.js";
+import { createWall } from "./video-wall.js";
+import { setupPip } from "./video-pip.js";
+import { previewFirstFrame } from "./player.js";
 import checkerNotice from "../licenses/iptv-checker-rs.txt?raw";
 import hlsNotice from "../node_modules/hls.js/LICENSE?raw";
 import apacheLicense from "../node_modules/@tauri-apps/api/LICENSE-APACHE-2.0?raw";
@@ -76,8 +78,7 @@ let catalog = [],
   favoritesOnly = false,
   query = "",
   limit = 75;
-let activeUrl = "",
-  shows = [],
+let shows = [],
   guideMessage = "",
   guideVersion = 0,
   dialogType = "",
@@ -94,39 +95,35 @@ const inFlight = new Map();
 function status(text) {
   $("status").textContent = text;
 }
-const player = new Player($("video"), {
-  trying(url) {
-    activeUrl = url;
-    $("cover").hidden = true;
-    status("正在连接线路 " + (current.routes.indexOf(url) + 1) + "…");
-    renderRouteModal();
+const wall = createWall({
+  playRoutes: orderedRoutes,
+  onFocus(tile) {
+    current = tile.channel;
+    $("now").textContent = current?.name || "从频道列表选择此画面的频道";
+    $("schedule").disabled =
+      $("save").disabled =
+      $("routes").disabled =
+        !current;
+    drawFavorite();
+    drawList();
+    updateStatus(tile);
   },
-  playing(url) {
-    preferred[current.id] = url;
+  onStatus: updateStatus,
+  onPlaying(channel, url) {
+    preferred[channel.id] = url;
     write("preferred", preferred);
-    status("已实际起播 · 线路 " + (current.routes.indexOf(url) + 1));
-    renderRouteModal();
   },
-  exhausted() {
-    activeUrl = "";
-    $("cover").hidden = false;
-    $("play").textContent = "重新播放";
-    status("当前频道的线路均未能起播，可检测线路或稍后重试。");
-    renderRouteModal();
-  },
-  tap() {
-    status("请点画面中的播放键继续");
+  onChoose() {
+    $("listTitle").scrollIntoView({ block: "nearest" });
+    $("channels").querySelector("button")?.focus({ preventScroll: true });
   },
 });
-
-const radio = setupRadio(read, write, () => {
-  if (activeUrl) {
-    player.stop();
-    activeUrl = "";
-    $("cover").hidden = false;
-    status("");
-  }
-});
+function updateStatus(tile) {
+  status(tile.message);
+  $("pip").disabled = !tile.url || tile.video.readyState < 2;
+  renderRouteModal();
+}
+const radio = setupRadio(read, write, () => wall.stopAll());
 function showPage(isRadio) {
   if (isRadio && !$("radioPage").hidden) return;
   const wasRadio = !$("radioPage").hidden;
@@ -135,12 +132,7 @@ function showPage(isRadio) {
   $("search").parentElement.hidden = isRadio;
   $("radioNav").classList.toggle("active", isRadio);
   if (isRadio) {
-    if (activeUrl) {
-      player.stop();
-      activeUrl = "";
-      $("cover").hidden = false;
-      status("");
-    }
+    wall.stopAll();
     $("home").classList.remove("active");
     $("favorites").classList.remove("active");
     radio.open();
@@ -162,7 +154,7 @@ function orderedRoutes(channel, first) {
   ].filter((url) => channel.routes.includes(url));
 }
 function play(first) {
-  if (current) player.play(orderedRoutes(current, first));
+  if (current) wall.focused.player.play(orderedRoutes(current, first));
 }
 
 function rebuild() {
@@ -203,13 +195,16 @@ function rebuild() {
   );
   if (!counts.has(country)) country = "";
   picker.value = country;
-  if (current && byId.has(current.id)) current = byId.get(current.id);
-  else {
+  for (const tile of wall.tiles) {
+    if (tile.channel && byId.has(tile.channel.id))
+      tile.channel = byId.get(tile.channel.id);
+  }
+  current = wall.focused.channel;
+  if (!wall.tiles.some((tile) => tile.channel)) {
     const selected = byId.get(read("lastChannel", "")) ?? catalog[0];
     if (selected) select(selected, false);
   }
   drawList();
-  drawQuick();
   drawTabs();
 }
 async function refresh(sources = allSources) {
@@ -239,8 +234,7 @@ async function refresh(sources = allSources) {
     ? "同步结束，" + failed + " 份列表失败。"
     : "已同步 " + sources.length + " 份频道列表。";
   rebuild();
-  if (!current) {
-    $("title").textContent = "暂时无法载入频道";
+  if (!catalog.length) {
     status("请检查网络，打开「设置 · 频道源」重试。");
   }
   renderSources();
@@ -315,50 +309,27 @@ function drawList() {
       action("more", "显示更多", "channel"),
     );
 }
-function drawQuick() {
-  const picks = groupNames
-    .map((g) => catalog.find((c) => c.group === g && c.id !== current?.id))
-    .filter(Boolean);
-  $("quick").innerHTML = picks
-    .map((c) =>
-      action(
-        "channel",
-        "<small>" +
-          escape(c.group) +
-          "</small><strong>" +
-          escape(c.name) +
-          "</strong>",
-        "card",
-        c.id,
-      ),
-    )
-    .join("");
-}
 function select(c, start = true) {
-  player.stop();
   current = c;
-  activeUrl = "";
+  wall.focused.assign(c, start);
   group = c.group;
   if (country && group === "国际" && !c.countries.includes(country)) {
     country = $("tvCountry").value = "";
   }
   write("lastChannel", c.id);
-  $("cover").hidden = false;
-  $("title").textContent = $("now").textContent = c.name;
-  $("station").textContent =
-    c.group + " · " + c.countries.map(countryLabel).join("、");
-  $("play").disabled = $("save").disabled = $("routes").disabled = false;
-  $("play").textContent = "▶ 播放直播";
-  $("guideName").textContent = c.name;
-  status("");
+  $("now").textContent = c.name;
+  $("schedule").disabled = $("save").disabled = $("routes").disabled = false;
+  updateStatus(wall.focused);
   drawFavorite();
   drawTabs();
   drawList();
-  drawQuick();
-  loadGuide(c);
-  if (start) play();
 }
 function drawFavorite() {
+  if (!current) {
+    $("save").textContent = "☆ 收藏";
+    $("save").classList.remove("on");
+    return;
+  }
   $("save").textContent = favorites.has(current.id) ? "★ 已收藏" : "☆ 收藏";
   $("save").classList.toggle("on", favorites.has(current.id));
 }
@@ -369,7 +340,7 @@ async function loadGuide(c) {
   drawGuide();
   try {
     const result = await invoke("programmes", {
-      region: c.region,
+      region: c.countries.find((code) => code !== "?") || c.region,
       name: c.name,
       id: c.epg_id,
     });
@@ -390,9 +361,10 @@ function clock(t) {
   });
 }
 function drawGuide() {
+  if (dialogType !== "guide" || !current) return;
   const now = Date.now() / 1000;
   visibleShows = shows.filter((s) => s.stop > now).slice(0, 4);
-  $("shows").innerHTML =
+  const content =
     visibleShows
       .map((s, i) =>
         action(
@@ -412,6 +384,14 @@ function drawGuide() {
     '<p class="empty">' +
       escape(guideMessage || "选择频道后查看节目单") +
       "</p>";
+  dialog(
+    "guide",
+    "<h2>" +
+      escape(current.name) +
+      " · 节目单</h2><div class='guide-list'>" +
+      content +
+      "</div>",
+  );
 }
 function dialog(type, html) {
   dialogType = type;
@@ -487,7 +467,7 @@ function renderRouteModal() {
         "route",
         "线路 " +
           (i + 1) +
-          (url === activeUrl ? "　· 当前" : "") +
+          (url === wall.focused.url ? "　· 当前" : "") +
           "<small>" +
           escape(new URL(url).host) +
           "　" +
@@ -718,8 +698,9 @@ $("favorites").onclick = () => {
   drawList();
 };
 $("schedule").onclick = () => {
-  showPage(false);
-  $("guide").scrollIntoView({ block: "center" });
+  if (!current) return;
+  dialogType = "guide";
+  loadGuide(current);
 };
 $("save").onclick = () => {
   if (!current) return;
@@ -748,7 +729,11 @@ $("dialogBody").addEventListener("change", (event) => {
     write("auto-sync", autoSync);
   }
 });
-$("play").onclick = () => play();
+$("layouts").onclick = (event) => {
+  const button = event.target.closest("button[data-layout]");
+  if (button) wall.layout(Number(button.dataset.layout));
+};
+setupPip(wall, status);
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -826,9 +811,8 @@ document.addEventListener("click", (e) => {
     }
   }
 });
+wall.layout(1);
 rebuild();
-drawGuide();
-setInterval(drawGuide, 60000);
 if (!isTauri()) {
   status("请从 FreeTV 客户端打开，或使用 npm run tauri dev 启动。");
 } else {

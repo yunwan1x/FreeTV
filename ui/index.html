@@ -17,7 +17,6 @@
           <nav>
             <button id="home" class="active">电视直播</button
             ><button id="radioNav">全球电台</button
-            ><button id="schedule">节目单</button
             ><button id="favorites">我的收藏</button>
           </nav>
         </div>
@@ -32,15 +31,33 @@
         <h1>电视直播</h1>
         <button class="textbtn" id="manage">设置 · 频道源</button>
       </div>
+      <div class="watch-tools">
+        <div
+          id="layouts"
+          class="layout-picker"
+          role="group"
+          aria-label="观看布局"
+        >
+          <button data-layout="1" aria-pressed="true">单画面</button>
+          <button data-layout="2" aria-pressed="false">双画面</button>
+          <button data-layout="4" aria-pressed="false">四宫格</button>
+        </div>
+        <button class="outline" id="pip" disabled>画中画</button>
+      </div>
+      <button class="outline" id="restorePip" hidden>返回直播大厅</button>
       <div class="stage">
-        <section class="player">
-          <video id="video" playsinline controls></video>
-          <div class="cover" id="cover">
-            <span class="stamp" id="station">FreeTV</span>
-            <h2 id="title">正在载入频道</h2>
-            <button id="play" disabled>播放直播</button>
-          </div>
-        </section>
+        <div id="wall" class="wall" data-layout="1"></div>
+        <template id="tileTemplate">
+          <section class="screen">
+            <video playsinline controls></video>
+            <button class="screen-tag" aria-pressed="false"></button>
+            <div class="cover">
+              <span class="stamp"></span>
+              <h2></h2>
+              <button class="screen-play">播放直播</button>
+            </div>
+          </section>
+        </template>
         <aside class="chanbox">
           <div class="between">
             <h2 id="listTitle">频道选择</h2>
@@ -60,21 +77,11 @@
           ><small class="status" id="status" role="status"></small>
         </div>
         <div class="chipline">
-          <button class="outline" id="routes" disabled>线路</button
+          <button class="outline" id="schedule" disabled>节目单</button
+          ><button class="outline" id="routes" disabled>线路</button
           ><button class="outline" id="save" disabled>☆ 收藏</button>
         </div>
       </div>
-      <section class="section" id="guide">
-        <div class="between">
-          <h2>节目单</h2>
-          <span class="meta" id="guideName"></span>
-        </div>
-        <div class="guide" id="shows"></div>
-      </section>
-      <section class="section">
-        <h2>快速选台</h2>
-        <div class="recs" id="quick"></div>
-      </section>
       <footer>
         <button id="notices">FreeTV · 开源许可</button
         ><span>频道来源　Free-TV / best-fan</span>
