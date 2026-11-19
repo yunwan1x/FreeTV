@@ -29,7 +29,7 @@ Android 需配置 JDK、Android SDK/NDK 和 Rust Android target。运行 `npm ru
 
 ## GitHub Actions
 
-推送 main、v 开头的标签、提交 PR 或手动运行 **Build FreeTV** 会生成 Windows x64 NSIS 安装包、macOS Apple Silicon DMG、Linux x64 DEB 和 Android arm64 APK。在该次运行的 Artifacts 下载。Windows、macOS 使用未做发行者签名或公证的测试分发构建。Android 默认用此次 CI 的临时证书签名，不同运行的测试 APK 签名不同，如需覆盖更新需使用同一把密钥。可配置四个仓库 Secrets 启用固定发布签名：
+推送 main、v 开头的标签、提交 PR 或手动运行 **Build FreeTV** 会生成 Windows x64 NSIS 安装包、macOS Apple Silicon DMG、Linux x64 DEB 和 Android arm64 APK。在该次运行的 Artifacts 下载。版本标签构建成功后，工作流会将四个安装包附加到对应的 GitHub Release 草稿，供核对后发布。Windows、macOS 使用未做发行者签名或公证的测试分发构建。Android 默认用此次 CI 的临时证书签名，不同运行的测试 APK 签名不同，如需覆盖更新需使用同一把密钥。可配置四个仓库 Secrets 启用固定发布签名：
 
 - ANDROID_KEYSTORE_BASE64
 - ANDROID_KEY_ALIAS

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 pub fn client() -> Result<Client, reqwest::Error> {
     Client::builder()
-        .user_agent("FreeTV/0.1")
+        .user_agent(concat!("FreeTV/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(6))
         .timeout(Duration::from_secs(20))
         .build()

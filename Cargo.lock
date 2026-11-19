@@ -940,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "freetv"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "freetv-core",
  "reqwest 0.12.28",
@@ -952,7 +952,7 @@ dependencies = [
 
 [[package]]
 name = "freetv-core"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "chrono",
  "flate2",
