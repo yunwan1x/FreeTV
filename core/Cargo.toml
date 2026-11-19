@@ -1,0 +1,13 @@
+[package]
+name = "freetv-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+flate2 = "1"
+quick-xml = { version = "0.38", features = ["serialize"] }
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots","rustls-tls-webpki-roots","gzip","stream"] }
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["macros","rt-multi-thread","time","sync"] }

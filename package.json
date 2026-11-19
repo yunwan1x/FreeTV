@@ -1,0 +1,13 @@
+{
+  "name": "freetv-player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite ui --host 127.0.0.1",
+    "build": "vite build ui --outDir ../dist --emptyOutDir",
+    "tauri": "tauri"
+  },
+  "dependencies": {"@tauri-apps/api": "^2.8.0", "hls.js": "^1.6.0"},
+  "devDependencies": {"@tauri-apps/cli": "^2.8.0", "vite": "^7.3.0"}
+}

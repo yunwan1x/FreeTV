@@ -1,0 +1,7 @@
+[workspace]
+members = ["core", "src-tauri"]
+resolver = "2"
+
+[profile.dev]
+debug = 0
+incremental = false

@@ -1,0 +1,93 @@
+name: Build FreeTV
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, platform: linux-x64, bundle: deb, extension: deb}
+          - {os: windows-latest, platform: windows-x64, bundle: nsis, extension: exe}
+          - {os: macos-15, platform: macos-arm64, bundle: dmg, extension: dmg}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - uses: dtolnay/rust-toolchain@stable
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: cargo test --locked -p freetv-core
+      - run: npm run tauri -- build --ci --bundles ${{ matrix.bundle }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FreeTV-${{ matrix.platform }}
+          path: target/release/bundle/${{ matrix.bundle }}/*.${{ matrix.extension }}
+          if-no-files-found: error
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 22, cache: npm}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: '17'}
+      - uses: android-actions/setup-android@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with: {targets: aarch64-linux-android}
+      - uses: Swatinem/rust-cache@v2
+        with: {shared-key: android-arm64}
+      - run: npm ci
+      - name: Install Android build tools
+        run: |
+          sdkmanager 'ndk;27.2.12479018' 'platforms;android-36' 'build-tools;36.0.0'
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Generate native project and build APK
+        run: |
+          npm run tauri -- android init --ci --skip-targets-install
+          npm run tauri -- icon assets/icon.svg
+          npm run tauri -- android build --ci --apk --target aarch64
+      - name: Sign and verify APK
+        env:
+          RELEASE_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          apk=$(find src-tauri/gen/android/app/build/outputs/apk -name '*.apk' -path '*/release/*' -print -quit)
+          test -f "$apk"
+          key="$RUNNER_TEMP/signing.jks"
+          label=release
+          if [[ -n "$RELEASE_KEY" ]]; then
+            printf '%s' "$RELEASE_KEY" | base64 -d > "$key"
+          else
+            label=test
+            KEY_ALIAS=freetv-test
+            STORE_PASSWORD=$(openssl rand -hex 24)
+            KEY_PASSWORD="$STORE_PASSWORD"
+            export STORE_PASSWORD KEY_PASSWORD
+            keytool -genkeypair -keystore "$key" -storetype JKS -storepass:env STORE_PASSWORD -keypass:env KEY_PASSWORD -alias "$KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 365 -dname "CN=FreeTV CI Test"
+          fi
+          mkdir -p artifacts
+          "$tools/zipalign" -f -P 16 4 "$apk" "$RUNNER_TEMP/aligned.apk"
+          final="artifacts/FreeTV-arm64-$label.apk"
+          "$tools/apksigner" sign --ks "$key" --ks-key-alias "$KEY_ALIAS" --ks-pass env:STORE_PASSWORD --key-pass env:KEY_PASSWORD --out "$final" "$RUNNER_TEMP/aligned.apk"
+          "$tools/apksigner" verify --verbose "$final"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FreeTV-android-arm64
+          path: artifacts/*.apk
+          if-no-files-found: error
