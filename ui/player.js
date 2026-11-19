@@ -7,7 +7,7 @@ class MediaLoader extends Hls.DefaultConfig.loader {
     this.context = context;
     const stats = this.stats;
     stats.loading.start = performance.now();
-    const range = Number.isFinite(context.rangeEnd) ? [context.rangeStart ?? 0, context.rangeEnd - 1] : null;
+    const range = context.rangeEnd > (context.rangeStart ?? 0) ? [context.rangeStart ?? 0, context.rangeEnd - 1] : null;
     invoke('media', {url: context.url, range}).then(raw => {
       if (this.ended) return;
       const data = new Uint8Array(raw);
@@ -17,6 +17,7 @@ class MediaLoader extends Hls.DefaultConfig.loader {
       stats.loading.first = stats.loading.end = performance.now();
       stats.loaded = stats.total = body.byteLength;
       const result = context.responseType === 'arraybuffer' ? body.slice().buffer : new TextDecoder().decode(body);
+      callbacks.onProgress?.(stats, context, result, null);
       callbacks.onSuccess({url, data:result, code:200}, stats, context, null);
     }).catch(error => {
       if (!this.ended) callbacks.onError({code:0, text:String(error)}, context, null, stats);

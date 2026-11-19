@@ -6,13 +6,6 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, io::Read};
 
 #[derive(Deserialize)]
-struct Tv {
-    #[serde(default)]
-    channel: Vec<Station>,
-    #[serde(default)]
-    programme: Vec<Entry>,
-}
-#[derive(Deserialize)]
 struct Station {
     #[serde(rename = "@id")]
     id: String,
@@ -47,25 +40,44 @@ fn stamp(s: &str) -> Option<i64> {
 }
 impl Guide {
     fn parse(raw: &[u8], now: i64) -> Result<Self, String> {
-        let tv: Tv = quick_xml::de::from_reader(raw).map_err(|_| "无法读取 XMLTV 节目单")?;
+        // XMLTV feeds can contain tens of thousands of programmes. Deserialize one
+        // record at a time so unrelated stations and descriptions are discarded promptly.
+        use quick_xml::{events::Event, Reader};
+        let mut reader = Reader::from_reader(raw);
         let mut ids = HashMap::new();
-        for c in tv.channel {
-            for name in c.names {
-                ids.entry(key(&name)).or_insert_with(|| c.id.clone());
-            }
-        }
         let mut shows = HashMap::<String, Vec<Show>>::new();
-        for e in tv.programme {
-            let (Some(start), Some(stop), Some(title)) =
-                (stamp(&e.start), stamp(&e.stop), e.title.into_iter().next())
-            else {
-                continue;
+        loop {
+            let begin = reader.buffer_position() as usize;
+            let event = reader.read_event().map_err(|e| e.to_string())?;
+            let tag = match event {
+                Event::Start(ref tag)
+                    if matches!(tag.name().as_ref(), b"channel" | b"programme") =>
+                {
+                    tag
+                }
+                Event::Eof => break,
+                _ => continue,
             };
-            if stop > now - 86400 && start < now + 172800 {
-                shows
-                    .entry(e.channel)
-                    .or_default()
-                    .push(Show { start, stop, title });
+            reader.read_to_end(tag.name()).map_err(|e| e.to_string())?;
+            let record = &raw[begin..reader.buffer_position() as usize];
+            if tag.name().as_ref() == b"channel" {
+                let c: Station = quick_xml::de::from_reader(record).map_err(|e| e.to_string())?;
+                for name in c.names {
+                    ids.entry(key(&name)).or_insert_with(|| c.id.clone());
+                }
+            } else {
+                let e: Entry = quick_xml::de::from_reader(record).map_err(|e| e.to_string())?;
+                let (Some(start), Some(stop), Some(title)) =
+                    (stamp(&e.start), stamp(&e.stop), e.title.into_iter().next())
+                else {
+                    continue;
+                };
+                if stop > now - 86400 && start < now + 172800 {
+                    shows
+                        .entry(e.channel)
+                        .or_default()
+                        .push(Show { start, stop, title });
+                }
             }
         }
         for v in shows.values_mut() {
