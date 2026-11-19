@@ -2,6 +2,7 @@ package app.freetv.radio
 
 import android.app.Activity
 import android.app.PictureInPictureParams
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Rational
@@ -35,6 +36,8 @@ class RadioPlugin(private val activity: Activity) : Plugin(activity) {
 
     private var view: WebView? = null
 
+    private var previousOrientation: Int? = null
+
     private val fullscreenBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
             setFullscreen(false)
@@ -43,19 +46,30 @@ class RadioPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun setFullscreen(enabled: Boolean) {
+        if (fullscreenBack.isEnabled == enabled) return
         val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (enabled) {
+            previousOrientation = activity.requestedOrientation
+            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(WindowInsetsCompat.Type.systemBars())
-        } else controller.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+            previousOrientation?.let { activity.requestedOrientation = it }
+            previousOrientation = null
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
         fullscreenBack.isEnabled = enabled
     }
 
     @Command
     fun fullscreen(invoke: Invoke) {
         activity.runOnUiThread {
-            setFullscreen(invoke.getArgs().getBoolean("enabled"))
-            invoke.resolve()
+            try {
+                setFullscreen(invoke.getArgs().getBoolean("enabled"))
+                invoke.resolve()
+            } catch (e: IllegalStateException) {
+                invoke.reject("系统无法切换全屏方向", e)
+            }
         }
     }
 

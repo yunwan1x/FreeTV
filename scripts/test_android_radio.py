@@ -193,12 +193,19 @@ def test(folder):
     print("TV state:", evaluate("[document.querySelector('#now')?.innerText,document.querySelector('#channels')?.innerText.slice(0,240)]"), flush=True)
     evaluate("document.querySelector('#channels [data-i=pip-test]').click()")
     wait(lambda: evaluate("document.querySelector('.screen video').currentTime > 1"))
-    evaluate("document.querySelector('#fullscreen').click()")
-    wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
-    wait(lambda: evaluate("!document.body.classList.contains('cinema-mode')"))
-    check_status_bar_clearance()
-    print("Verified Android fullscreen and system Back.", flush=True)
+    landscape = "matchMedia('(orientation: landscape)').matches"
+    was_landscape = evaluate(landscape)
+    for exit_button in (True, False):
+        evaluate("document.querySelector('#fullscreen').click()")
+        wait(lambda: evaluate("document.body.classList.contains('cinema-mode')") and evaluate(landscape))
+        if exit_button:
+            evaluate("document.querySelector('#exitFullscreen').click()")
+        else:
+            adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        wait(lambda: not evaluate("document.body.classList.contains('cinema-mode')") and
+             evaluate(landscape) == was_landscape)
+        check_status_bar_clearance()
+    print("Verified landscape fullscreen and restoration by exit button and system Back.", flush=True)
     evaluate("document.querySelector('#pip').click()")
     def pinned():
         return re.search(r"mode=pinned[^\n]*", adb("shell", "dumpsys", "activity", "activities")) is not None

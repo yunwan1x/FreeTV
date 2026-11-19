@@ -134,15 +134,19 @@
       <section id="vodWatch" hidden>
         <div class="between headline">
           <button class="outline" id="vodBack">‹ 返回片库</button>
+          <button class="outline" id="vodFullscreen">全屏</button>
         </div>
         <div class="vod-watch-grid">
           <section>
-            <video
-              id="vodVideo"
-              controls
-              playsinline
-              preload="metadata"
-            ></video>
+            <div id="vodFrame">
+              <video
+                id="vodVideo"
+                controls
+                playsinline
+                preload="metadata"
+              ></video>
+              <button id="vodExitFullscreen" hidden>退出全屏</button>
+            </div>
             <div class="between vod-list-heading">
               <h1 id="vodTitle"></h1>
               <button class="outline" id="vodSave">收藏</button>
