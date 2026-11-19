@@ -122,7 +122,6 @@ function shelfName(film, provider) {
 export function setupVod(read, write) {
   let visible = false,
     view = "browse",
-    previous = "browse",
     filter = "",
     query = "",
     savedOnly = false;
@@ -242,12 +241,10 @@ export function setupVod(read, write) {
       detailEpoch++;
     }
     covers.reset();
-    settings.close();
     view = next;
     for (const [name, id] of [
       ["browse", "vodBrowse"],
       ["watch", "vodWatch"],
-      ["settings", "vodSettings"],
     ])
       $(id).hidden = name !== view;
     window.scrollTo(0, 0);
@@ -377,7 +374,7 @@ export function setupVod(read, write) {
       .map((p) => p.name + "：" + p.error);
     const failedStatus = filter
       ? failures[0]
-      : [films.length ? "" : "未找到匹配影片。", failures.length + " 个来源读取失败，可在点播设置中查看。"].join("");
+      : [films.length ? "" : "未找到匹配影片。", failures.length + " 个来源读取失败，可在设置的「点播来源」中查看。"].join("");
     const status = savedOnly
       ? films.length
         ? ""
@@ -385,7 +382,7 @@ export function setupVod(read, write) {
       : busy
         ? "正在读取片库 · " + results.size + " 个来源"
         : !enabled().length
-          ? "请在点播设置中启用来源。"
+          ? "请在设置的「点播来源」中启用来源。"
           : failures.length
             ? failedStatus
             : films.length
@@ -576,7 +573,7 @@ export function setupVod(read, write) {
       : [];
     setProviders();
     if (!source) {
-      message("此来源已停用或移除，可在点播设置中重新启用。");
+      message("此来源已停用或移除，可在设置的「点播来源」中重新启用。");
       return;
     }
     message("正在读取分集…");
@@ -694,23 +691,8 @@ export function setupVod(read, write) {
     savedOnly = false;
     load();
   };
-  document.querySelectorAll(".vod-settings-link").forEach(
-    (b) =>
-      (b.onclick = () => {
-        previous = view;
-        selectView("settings");
-        settings.open();
-      }),
-  );
-  $("vodSettingsBack").onclick = () => {
-    if (previous === "watch" && film)
-      watch(
-        film,
-        history && identity(film) === identity(history.film) ? history : null,
-      );
-    else browse();
-  };
   return {
+    settings,
     open() {
       visible = true;
       browse();
@@ -724,7 +706,6 @@ export function setupVod(read, write) {
       catalogKey = "";
       stop();
       covers.reset();
-      settings.close();
     },
   };
 }

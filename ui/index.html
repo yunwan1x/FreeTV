@@ -21,16 +21,18 @@
             ><button id="favorites">我的收藏</button>
           </nav>
         </div>
-        <label class="search"
-          >⌕
-          <input id="search" aria-label="搜索频道" placeholder="搜索频道或地区"
-        /></label>
+        <div class="row header-actions">
+          <label class="search"
+            >⌕
+            <input id="search" aria-label="搜索频道" placeholder="搜索频道或地区"
+          /></label>
+          <button class="outline" id="manage" aria-haspopup="dialog">设置</button>
+        </div>
       </div>
     </header>
     <main id="tvPage">
       <div class="between headline">
         <h1>电视直播</h1>
-        <button class="textbtn" id="manage">设置</button>
       </div>
       <div class="watch-tools">
         <div
@@ -100,15 +102,13 @@
         </div>
       </div>
       <footer>
-        <button id="notices">FreeTV · 开源许可</button
-        ><span>频道来源　Free-TV / best-fan</span>
+        <span>频道来源　Free-TV / best-fan</span>
       </footer>
     </main>
     <main id="vodPage" hidden>
       <section id="vodBrowse">
         <div class="between headline">
           <h1>点播</h1>
-          <button class="outline vod-settings-link">点播设置</button>
         </div>
         <form id="vodSearchForm">
           <input
@@ -133,8 +133,7 @@
       </section>
       <section id="vodWatch" hidden>
         <div class="between headline">
-          <button class="outline" id="vodBack">‹ 返回片库</button
-          ><button class="outline vod-settings-link">点播设置</button>
+          <button class="outline" id="vodBack">‹ 返回片库</button>
         </div>
         <div class="vod-watch-grid">
           <section>
@@ -163,55 +162,11 @@
           </aside>
         </div>
       </section>
-      <section id="vodSettings" hidden>
-        <div class="between headline">
-          <h1>点播设置</h1>
-          <button class="outline" id="vodSettingsBack">返回点播</button>
-        </div>
-        <div class="vod-settings-grid">
-          <section class="vod-panel">
-            <div class="between">
-              <h2>源订阅</h2>
-              <button class="outline" id="vodSyncAll">同步全部</button>
-            </div>
-            <label class="auto-sync"
-              ><input
-                type="checkbox"
-                id="vodAuto"
-              />打开点播时自动发现新源，每天更新订阅</label
-            >
-            <p>首次打开会读取内置点播源集合，新源自动加入搜索。可在下方关闭单个来源。</p>
-            <div id="vodSources"></div>
-            <div id="vodProbeHost"></div>
-            <form id="vodAddForm">
-              <label for="vodSubUrl">添加在线订阅</label>
-              <div class="vod-import">
-                <input
-                  id="vodSubUrl"
-                  type="url"
-                  required
-                  placeholder="https://…/sources.json"
-                /><button class="outline">添加</button>
-              </div>
-              <small
-                >支持 LibreTV、LunaTV、OuonnkiTV 和 TVBox JSON 采集接口。</small
-              >
-              <p role="status" id="vodImportMsg"></p>
-            </form>
-          </section>
-          <aside class="vod-panel">
-            <h2>网络代理</h2>
-            <p>可分别设置订阅与搜索、媒体播放是否使用代理。</p>
-            <button class="outline" data-act="proxy">点播代理规则</button>
-          </aside>
-        </div>
-      </section>
     </main>
     <main id="radioPage" hidden>
       <section class="between headline">
         <h1>全球电台</h1>
         <div class="view-actions">
-          <button class="textbtn" data-act="proxy">网络代理</button>
           <button class="outline" id="radioFavs">电台收藏</button>
         </div>
       </section>
@@ -325,7 +280,48 @@
       </form>
     </template>
     <dialog class="sheet" id="dialog">
-      <div id="dialogBody" class="modalScroll"></div>
+      <div id="settingsNav" hidden>
+        <h2>设置</h2>
+        <div role="group" aria-label="设置分类" class="settings-tabs">
+          <button class="outline" data-act="tvSettings">电视频道</button>
+          <button class="outline" data-act="vodSettings">点播来源</button>
+          <button class="outline" data-act="proxy">网络代理</button>
+          <button class="outline" id="notices">开源许可</button>
+        </div>
+      </div>
+      <div class="modalScroll">
+        <div id="dialogBody"></div>
+        <section id="vodSettings" class="vod-panel" hidden>
+          <div class="between">
+            <h2>点播源订阅</h2>
+            <button class="outline" id="vodSyncAll">同步全部</button>
+          </div>
+          <label class="auto-sync"
+            ><input
+              type="checkbox"
+              id="vodAuto"
+            />打开点播时自动发现新源，每天更新订阅</label
+          >
+          <p>首次打开会读取内置点播源集合，新源自动加入搜索。可在下方关闭单个来源。</p>
+          <div id="vodSources"></div>
+          <div id="vodProbeHost"></div>
+          <form id="vodAddForm">
+            <label for="vodSubUrl">添加在线订阅</label>
+            <div class="vod-import">
+              <input
+                id="vodSubUrl"
+                type="url"
+                required
+                placeholder="https://…/sources.json"
+              /><button class="outline">添加</button>
+            </div>
+            <small
+              >支持 LibreTV、LunaTV、OuonnkiTV 和 TVBox JSON 采集接口。</small
+            >
+            <p role="status" id="vodImportMsg"></p>
+          </form>
+        </section>
+      </div>
       <button class="outline" id="close">关闭</button>
     </dialog>
     <script type="module" src="/main.js"></script>

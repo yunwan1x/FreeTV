@@ -1482,3 +1482,25 @@ footer button {
   background: #fcece8;
   color: #923025;
 }
+
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.settings-tabs button[aria-pressed="true"] {
+  color: #a22c24;
+  background: #fff0eb;
+  border-color: #e9a79d;
+}
+.sheet:has(#settingsNav:not([hidden])) {
+  width: min(640px, 94vw);
+}
+.sheet .modalScroll {
+  max-height: min(65vh, calc(100dvh - 156px));
+}
+@media (max-width: 760px) {
+  .header-actions { gap: 6px; }
+  .header-actions .search input { width: min(28vw, 118px); }
+}

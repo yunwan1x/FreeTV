@@ -219,7 +219,42 @@ async fn media(
 pub fn run() {
     let builder = tauri::Builder::default();
     #[cfg(target_os = "android")]
-    let builder = builder.plugin(tauri_plugin_radio::init());
+    let builder = builder
+        .plugin(tauri_plugin_radio::init())
+        .on_page_load(|view, payload| {
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                // Wry installs the WebView as the Activity content. Let its parent fit the
+                // visible system bars, so dialogs and the header share the same viewport.
+                let result = view.with_webview(|platform| {
+                    platform.jni_handle().exec(|env, _, webview| {
+                        let fit = (|| {
+                            let parent = env
+                                .call_method(
+                                    webview,
+                                    "getParent",
+                                    "()Landroid/view/ViewParent;",
+                                    &[],
+                                )?
+                                .l()?;
+                            env.call_method(
+                                &parent,
+                                "setFitsSystemWindows",
+                                "(Z)V",
+                                &[true.into()],
+                            )?;
+                            env.call_method(&parent, "requestApplyInsets", "()V", &[])
+                        })();
+                        if let Err(error) = fit {
+                            let _ = env.exception_clear();
+                            eprintln!("Failed to fit Android system bars: {error}");
+                        }
+                    });
+                });
+                if let Err(error) = result {
+                    eprintln!("Failed to access Android WebView: {error}");
+                }
+            }
+        });
     builder
         .setup(|app| {
             let path = app.path().app_config_dir()?.join("proxy.json");

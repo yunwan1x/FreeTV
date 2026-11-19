@@ -340,8 +340,18 @@ function drawFavorite() {
   $("save").classList.toggle("on", favorites.has(current.id));
 }
 function dialog(type, html) {
+  const sections = { sources: "tvSettings", vod: "vodSettings", proxy: "proxy", licenses: "notices" };
+  const changed = type !== dialogType;
+  if (dialogType === "vod" && changed) vod.settings.close();
   dialogType = type;
+  $("settingsNav").hidden = !sections[type];
+  $("dialog").setAttribute("aria-label", sections[type] ? "设置" : "频道线路");
+  for (const button of $("settingsNav").querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String((button.dataset.act || button.id) === sections[type]));
+  }
+  $("vodSettings").hidden = type !== "vod";
   $("dialogBody").innerHTML = html;
+  if (changed) $("dialogBody").parentElement.scrollTop = 0;
   if (!$("dialog").open) $("dialog").showModal();
 }
 let deepBackend,
@@ -388,7 +398,7 @@ async function chooseFFmpeg() {
   } catch (error) {
     pickerMessage = String(error);
   }
-  renderRouteModal();
+  renderSources();
 }
 function deepSettings() {
   if (deepBackend === "player")
@@ -453,7 +463,6 @@ function renderRouteModal() {
       escape(current.name) +
       " · 线路</h2>" +
       scanControl() +
-      deepSettings() +
       rows,
   );
 }
@@ -532,9 +541,7 @@ function renderSources() {
     .join("");
   dialog(
     "sources",
-    "<div class='between'><h2>频道源设置</h2>" +
-      action("proxy", "网络代理", "outline") +
-      "</div>" +
+    "<h2>电视频道订阅</h2>" +
       '<label class="auto-sync"><input id="autoSync" type="checkbox"' +
       (autoSync ? " checked" : "") +
       ">启动时自动同步超过 6 小时的列表</label>" +
@@ -544,7 +551,7 @@ function renderSources() {
       (pendingSources.size ? "正在同步…" : syncMessage) +
       "</p>" +
       "<h3>线路检测</h3>" +
-      scanControl(),
+      scanControl() + deepSettings(),
   );
 }
 async function openProxy() {
@@ -700,13 +707,19 @@ $("notices").onclick = () =>
   );
 $("dialog").onclose = () => {
   previewController?.abort();
+  vod.settings.close();
   dialogType = "";
 };
 $("close").onclick = () => $("dialog").close();
-$("manage").onclick = () => {
-  dialogType = "sources";
+$("manage").onclick = openTvSettings;
+function openTvSettings() {
+  dialog("sources", "");
   renderSources();
-};
+  if (!deepBackend) invoke("deep_check_backend").then((mode) => {
+    deepBackend = mode;
+    renderSources();
+  }).catch(() => {});
+}
 $("routes").onclick = () => {
   dialogType = "routes";
   renderRouteModal();
@@ -805,7 +818,7 @@ document.addEventListener("click", (e) => {
       ffmpegPath = null;
       write("ffmpeg-path", null);
       pickerMessage = "";
-      renderRouteModal();
+      renderSources();
       break;
     case "checkChannel":
       scan(current.routes, current.name);
@@ -822,6 +835,13 @@ document.addEventListener("click", (e) => {
       write("health", [...health]);
       renderSources();
       renderRouteModal();
+      break;
+    case "tvSettings":
+      openTvSettings();
+      break;
+    case "vodSettings":
+      dialog("vod", "");
+      vod.settings.open();
       break;
     case "proxy":
       openProxy();
