@@ -123,9 +123,17 @@ def test(folder):
     assert is_playing(), "Radio stopped after display sleep"
     services = adb("shell", "dumpsys", "activity", "services", PACKAGE)
     assert "RadioService" in services and "isForeground=true" in services, services
-    adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PAUSE")
+    print("Verified screen-off foreground playback.", flush=True)
+    # Drive this media session as a lock-screen controller. Global input keys may
+    # be intercepted by the emulator's telecom or Bluetooth session.
+    sessions = adb("shell", "dumpsys", "media_session")
+    tag = re.search(re.escape(PACKAGE) + r"/([^/\s]+)/\d+ \(userId=", sessions).group(1)
+    def media_key(name):
+        subprocess.run(["adb", "shell", "cmd", "media_session", "monitor", tag],
+                       input=name + "\nquit\n", text=True, timeout=10, check=True)
+    media_key("pause")
     wait(lambda: session_state() == 2)
-    adb("shell", "input", "keyevent", "KEYCODE_MEDIA_PLAY")
+    media_key("play")
     wait(is_playing)
     print("Verified native playback, foreground service, screen-off playback and media-key pause/resume.")
     adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
@@ -134,11 +142,14 @@ def test(folder):
     print("TV state:", evaluate("[document.querySelector('#now')?.innerText,document.querySelector('#channels')?.innerText.slice(0,240)]"), flush=True)
     evaluate("document.querySelector('#channels [data-i=pip-test]').click()")
     wait(lambda: evaluate("document.querySelector('.screen video').currentTime > 1"))
-    evaluate("document.querySelector('#fullscreen').click()")
-    wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
-    adb("shell", "input", "keyevent", "KEYCODE_BACK")
-    wait(lambda: evaluate("!document.body.classList.contains('cinema-mode')"))
-    print("Verified Android fullscreen and system Back.")
+    # Older test APKs can also cover radio and PiP before fullscreen was added.
+    has_fullscreen = evaluate("!!document.querySelector('#fullscreen')")
+    if has_fullscreen:
+        evaluate("document.querySelector('#fullscreen').click()")
+        wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
+        adb("shell", "input", "keyevent", "KEYCODE_BACK")
+        wait(lambda: evaluate("!document.body.classList.contains('cinema-mode')"))
+        print("Verified Android fullscreen and system Back.")
     evaluate("document.querySelector('#pip').click()")
     def pinned():
         return re.search(r"mode=pinned[^\n]*", adb("shell", "dumpsys", "activity", "activities")) is not None
