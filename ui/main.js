@@ -1,5 +1,6 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { countryLabel, countryPicker } from "./country-picker.js";
+import { setupVod } from "./vod.js";
 import { setupRadio } from "./radio.js";
 import { createWall } from "./video-wall.js";
 import { setupFullscreen } from "./fullscreen.js";
@@ -123,25 +124,32 @@ function updateStatus(tile) {
   renderRouteModal();
 }
 const radio = setupRadio(read, write, () => wall.stopAll());
-function showPage(isRadio) {
-  if (isRadio && !$("radioPage").hidden) return;
-  const wasRadio = !$("radioPage").hidden;
-  $("tvPage").hidden = isRadio;
+const vod = setupVod(read, write);
+function showPage(page) {
+  const isRadio = page === "radio",
+    isVod = page === "vod",
+    isTV = !isRadio && !isVod;
+  if ((isRadio && !$("radioPage").hidden) || (isVod && !$("vodPage").hidden))
+    return;
+  if (!$("radioPage").hidden && !isRadio) radio.close();
+  if (!$("vodPage").hidden && !isVod) vod.close();
+  $("tvPage").hidden = !isTV;
   $("radioPage").hidden = !isRadio;
-  $("search").parentElement.hidden = isRadio;
+  $("vodPage").hidden = !isVod;
+  $("search").parentElement.hidden = !isTV;
   $("radioNav").classList.toggle("active", isRadio);
-  if (isRadio) {
+  $("vodNav").classList.toggle("active", isVod);
+  if (!isTV) {
     wall.stopAll();
     $("home").classList.remove("active");
     $("favorites").classList.remove("active");
-    radio.open();
-  } else if (wasRadio) {
-    radio.close();
-    drawList();
-  }
-  write("radio-visible", isRadio);
+    if (isRadio) radio.open();
+    else vod.open();
+  } else drawList();
+  write("last-page", page);
 }
-$("radioNav").onclick = () => showPage(true);
+$("radioNav").onclick = () => showPage("radio");
+$("vodNav").onclick = () => showPage("vod");
 function orderedRoutes(channel, first) {
   const weight = (url) =>
     health.get(url)?.ms ?? (health.has(url) ? Infinity : 1e6);
@@ -263,9 +271,9 @@ function drawList() {
       : "频道选择";
   $("favorites").classList.toggle(
     "active",
-    favoritesOnly && $("radioPage").hidden,
+    favoritesOnly && !$("tvPage").hidden,
   );
-  $("home").classList.toggle("active", !favoritesOnly && $("radioPage").hidden);
+  $("home").classList.toggle("active", !favoritesOnly && !$("tvPage").hidden);
   $("channels").innerHTML =
     items
       .slice(0, limit)
@@ -704,7 +712,7 @@ $("routes").onclick = () => {
       .catch((error) => status(String(error)));
 };
 $("home").onclick = () => {
-  showPage(false);
+  showPage("tv");
   favoritesOnly = false;
   query = "";
   $("search").value = "";
@@ -714,7 +722,7 @@ $("home").onclick = () => {
   drawList();
 };
 $("favorites").onclick = () => {
-  showPage(false);
+  showPage("tv");
   favoritesOnly = true;
   query = "";
   $("search").value = "";
@@ -832,4 +840,8 @@ if (!isTauri()) {
   if (stale.length) refresh(stale);
 }
 
-if (read("radio-visible", false)) showPage(true);
+const lastPage = read(
+  "last-page",
+  read("radio-visible", false) ? "radio" : "tv",
+);
+if (lastPage !== "tv") showPage(lastPage);

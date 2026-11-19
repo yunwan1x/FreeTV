@@ -9,6 +9,8 @@ pub enum Traffic {
     TvPlay,
     RadioList,
     RadioPlay,
+    VodList,
+    VodPlay,
 }
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -22,6 +24,8 @@ pub struct ProxySettings {
     pub tv_play: bool,
     pub radio_list: bool,
     pub radio_play: bool,
+    pub vod_list: bool,
+    pub vod_play: bool,
 }
 
 #[derive(Clone)]
@@ -65,7 +69,13 @@ impl Routing {
         let proxy = if settings.system {
             None
         } else if settings.address.is_empty() {
-            if settings.tv_list || settings.tv_play || settings.radio_list || settings.radio_play {
+            if settings.tv_list
+                || settings.tv_play
+                || settings.radio_list
+                || settings.radio_play
+                || settings.vod_list
+                || settings.vod_play
+            {
                 return Err("请先填写代理地址".into());
             }
             None
@@ -117,6 +127,8 @@ impl Routing {
             Traffic::TvPlay => s.tv_play,
             Traffic::RadioList => s.radio_list,
             Traffic::RadioPlay => s.radio_play,
+            Traffic::VodList => s.vod_list,
+            Traffic::VodPlay => s.vod_play,
         };
         if enabled && !s.system {
             self.proxy.as_ref().expect("validated proxy")

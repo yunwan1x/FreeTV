@@ -16,6 +16,7 @@
           <div class="brand"><i class="logo"></i>FreeTV</div>
           <nav>
             <button id="home" class="active">电视直播</button
+            ><button id="vodNav">影视点播</button
             ><button id="radioNav">全球电台</button
             ><button id="favorites">我的收藏</button>
           </nav>
@@ -102,6 +103,108 @@
         <button id="notices">FreeTV · 开源许可</button
         ><span>频道来源　Free-TV / best-fan</span>
       </footer>
+    </main>
+    <main id="vodPage" hidden>
+      <section id="vodBrowse">
+        <div class="between headline">
+          <h1>影视点播</h1>
+          <button class="outline vod-settings-link">点播设置</button>
+        </div>
+        <form id="vodSearchForm">
+          <input
+            type="search"
+            id="vodQuery"
+            aria-label="搜索影片或剧名"
+            placeholder="搜索影片或剧名"
+          /><button class="vod-primary">搜索</button>
+        </form>
+        <button id="vodResume" hidden></button>
+        <div class="between vod-list-heading">
+          <h2 id="vodListTitle">最近更新</h2>
+          <div class="vod-buttons">
+            <button class="outline" id="vodBookmarks">我的片单</button
+            ><button class="outline" id="vodRefresh">刷新</button>
+          </div>
+        </div>
+        <div class="vod-filters" id="vodFilters"></div>
+        <p id="vodMessage" role="status"></p>
+        <div class="vod-cards" id="vodCards"></div>
+        <button class="outline" id="vodMore" hidden>更多影片</button>
+      </section>
+      <section id="vodWatch" hidden>
+        <div class="between headline">
+          <button class="outline" id="vodBack">‹ 返回片库</button
+          ><button class="outline vod-settings-link">点播设置</button>
+        </div>
+        <div class="vod-watch-grid">
+          <section>
+            <video
+              id="vodVideo"
+              controls
+              playsinline
+              preload="metadata"
+            ></video>
+            <div class="between vod-list-heading">
+              <h1 id="vodTitle"></h1>
+              <button class="outline" id="vodSave">收藏</button>
+            </div>
+            <p id="vodPlayback" role="status"></p>
+          </section>
+          <aside class="vod-panel">
+            <h2>播放线路</h2>
+            <label>影片来源<select id="vodProvider"></select></label
+            ><label>线路<select id="vodLine"></select></label>
+            <div class="between vod-list-heading">
+              <h2>选集</h2>
+              <small id="vodEpCount"></small>
+            </div>
+            <div class="vod-episodes" id="vodEpisodes"></div>
+            <button class="outline" id="vodRetry">重新播放</button>
+          </aside>
+        </div>
+      </section>
+      <section id="vodSettings" hidden>
+        <div class="between headline">
+          <h1>点播设置</h1>
+          <button class="outline" id="vodSettingsBack">返回点播</button>
+        </div>
+        <div class="vod-settings-grid">
+          <section class="vod-panel">
+            <div class="between">
+              <h2>源订阅</h2>
+              <button class="outline" id="vodSyncAll">同步全部</button>
+            </div>
+            <label class="auto-sync"
+              ><input
+                type="checkbox"
+                id="vodAuto"
+              />打开点播时同步超过一天的订阅</label
+            >
+            <div id="vodSources"></div>
+            <div id="vodProbeHost"></div>
+            <form id="vodAddForm">
+              <label for="vodSubUrl">添加在线订阅</label>
+              <div class="vod-import">
+                <input
+                  id="vodSubUrl"
+                  type="url"
+                  required
+                  placeholder="https://…/sources.json"
+                /><button class="outline">添加</button>
+              </div>
+              <small
+                >支持 LibreTV、LunaTV、OuonnkiTV 和 TVBox JSON 采集接口。</small
+              >
+              <p role="status" id="vodImportMsg"></p>
+            </form>
+          </section>
+          <aside class="vod-panel">
+            <h2>网络代理</h2>
+            <p>可分别设置订阅与搜索、媒体播放是否使用代理。</p>
+            <button class="outline" data-act="proxy">点播代理规则</button>
+          </aside>
+        </div>
+      </section>
     </main>
     <main id="radioPage" hidden>
       <section class="between headline">
@@ -206,6 +309,11 @@
           >
           <label
             ><input type="checkbox" name="radioPlay" />电台 · 收听直播</label
+          ><label
+            ><input type="checkbox" name="vodList" />点播 ·
+            订阅、搜索与封面</label
+          ><label
+            ><input type="checkbox" name="vodPlay" />点播 · 媒体播放</label
           >
         </fieldset>
         <small

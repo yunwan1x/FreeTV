@@ -11,7 +11,12 @@ class MediaLoader extends Hls.DefaultConfig.loader {
       context.rangeEnd > (context.rangeStart ?? 0)
         ? [context.rangeStart ?? 0, context.rangeEnd - 1]
         : null;
-    invoke("media", { url: context.url, range, radio: this.radio === true })
+    invoke("media", {
+      url: context.url,
+      range,
+      radio: this.radio === true,
+      vod: this.vod === true,
+    })
       .then((raw) => {
         if (this.ended) return;
         const data = new Uint8Array(raw);
@@ -55,9 +60,14 @@ class RadioLoader extends MediaLoader {
   radio = true;
 }
 
+class VodLoader extends MediaLoader {
+  vod = true;
+}
+
 export class Player {
-  constructor(video, events, radio = false) {
+  constructor(video, events, radio = false, vod = false) {
     this.radio = radio;
+    this.vod = vod;
     this.video = video;
     this.events = events;
     this.generation = 0;
@@ -103,7 +113,7 @@ export class Player {
     });
     listen("pause", () => clearTimeout(this.timer));
     listen("error", fail);
-    listen("ended", fail);
+    listen("ended", this.vod ? () => this.events.ended?.() : fail);
     const start = () => {
       if (!current()) return;
       this.video.play().catch((error) => {
@@ -121,7 +131,7 @@ export class Player {
       Hls.isSupported()
     ) {
       const h = new Hls({
-        loader: this.radio ? RadioLoader : MediaLoader,
+        loader: this.vod ? VodLoader : this.radio ? RadioLoader : MediaLoader,
         enableWorker: false,
         lowLatencyMode: false,
         maxBufferLength: 25,
@@ -137,6 +147,7 @@ export class Player {
       invoke("playback_url", {
         url,
         radio: this.radio,
+        vod: this.vod,
         playlist: format === "hls",
       })
         .then((local) => {
@@ -151,7 +162,7 @@ export class Player {
 
 // Use a separate muted player for exactly one route. It never changes the main
 // player's stream, its fallback order, or the last successful channel.
-export function previewFirstFrame(url, host, signal) {
+export function previewFirstFrame(url, host, signal, vod = false) {
   const video = document.createElement("video");
   video.className = "probe-preview";
   video.muted = true;
@@ -161,12 +172,17 @@ export function previewFirstFrame(url, host, signal) {
   return new Promise((resolve, reject) => {
     let settled = false;
     let frameCallback;
-    const preview = new Player(video, {
-      trying() {},
-      playing() {},
-      exhausted: () => finish("播放器未能解码出视频帧"),
-      tap: () => finish("系统阻止了静音试播"),
-    });
+    const preview = new Player(
+      video,
+      {
+        trying() {},
+        playing() {},
+        exhausted: () => finish("播放器未能解码出视频帧"),
+        tap: () => finish("系统阻止了静音试播"),
+      },
+      false,
+      vod,
+    );
     const timer = setTimeout(() => finish("15 秒内未解码出视频帧"), 15000);
     const abort = () => finish("试播已停止");
     function finish(error) {

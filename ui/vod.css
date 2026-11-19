@@ -1,0 +1,324 @@
+#vodPage {
+  padding-bottom: 35px;
+}
+#vodPage input,
+#vodPage select {
+  font: inherit;
+  color: inherit;
+}
+#vodSearchForm,
+.vod-import {
+  display: flex;
+  gap: 8px;
+}
+#vodSearchForm {
+  max-width: 610px;
+  margin-bottom: 22px;
+}
+#vodSearchForm input,
+.vod-import input,
+.vod-panel select {
+  min-width: 0;
+  border: 1px solid #d5d5cf;
+  border-radius: 10px;
+  background: white;
+  padding: 9px 12px;
+}
+#vodSearchForm input,
+.vod-import input {
+  flex: 1;
+}
+.vod-primary {
+  background: #d8392e;
+  color: white;
+  border-radius: 10px;
+  padding: 9px 23px;
+  font-weight: 650;
+}
+.vod-list-heading {
+  margin: 18px 0 10px;
+  gap: 10px;
+}
+.vod-buttons,
+.vod-filters,
+.vod-episodes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.vod-filters {
+  margin: 10px 0 16px;
+}
+.vod-filters button[aria-pressed="true"],
+.vod-episodes button[aria-pressed="true"],
+#vodBookmarks[aria-pressed="true"] {
+  color: #a22c24;
+  background: #fff0eb;
+  border-color: #e9a79d;
+}
+#vodResume {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  width: 100%;
+  border-radius: 12px;
+  background: #222a29;
+  padding: 16px 20px;
+  color: white;
+  text-align: left;
+}
+#vodResume small {
+  color: #f0c0b4;
+}
+#vodResume strong {
+  font-size: 20px;
+}
+#vodResume span {
+  color: #ddd;
+  font-size: 13px;
+  margin-left: auto;
+}
+#vodMessage,
+#vodPlayback,
+#vodImportMsg {
+  color: #65665f;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+#vodMessage:not(:empty) {
+  margin: 0 0 13px;
+}
+.vod-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 17px 14px;
+}
+.vod-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  text-align: left;
+  min-width: 0;
+}
+.vod-card:focus-visible .vod-cover,
+.vod-card:hover .vod-cover {
+  box-shadow: 0 0 0 2px #c84839;
+}
+.vod-card > b,
+.vod-card > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vod-card > b {
+  font-size: 16px;
+  margin: 7px 0 1px;
+}
+.vod-card > small,
+.vod-panel small {
+  color: #70726a;
+  font-size: 12px;
+}
+.vod-cover {
+  position: relative;
+  aspect-ratio: 3/4;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #414643, #222b28);
+  display: grid;
+  place-items: center;
+}
+.vod-card:nth-child(3n + 2) .vod-cover {
+  background: linear-gradient(145deg, #8e7263, #4e3a39);
+}
+.vod-card:nth-child(3n) .vod-cover {
+  background: linear-gradient(145deg, #66747d, #313f48);
+}
+.vod-cover-fallback {
+  font:
+    600 20px/1.6 "Noto Serif CJK SC",
+    serif;
+  color: #fff9;
+  text-align: center;
+  padding: 15px;
+}
+.vod-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+}
+.vod-cover img.loaded {
+  opacity: 1;
+}
+.vod-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 7px;
+  background: #121412cc;
+  color: #fff;
+  border-radius: 4px;
+  max-width: 92%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+#vodMore {
+  margin-top: 18px;
+}
+.vod-watch-grid,
+.vod-settings-grid {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(0, 2.2fr) minmax(260px, 1fr);
+  gap: 18px;
+}
+.vod-panel {
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #deded8;
+  border-radius: 14px;
+  min-width: 0;
+}
+.vod-panel h2 {
+  font-size: 20px;
+}
+.vod-panel p,
+.vod-panel label {
+  font-size: 14px;
+}
+.vod-panel > p {
+  margin: 9px 0 13px;
+}
+.vod-panel > label:not(.auto-sync) {
+  display: block;
+  margin-top: 12px;
+  color: #64675e;
+}
+.vod-panel select {
+  display: block;
+  width: 100%;
+  margin: 4px 0;
+}
+#vodVideo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #101212;
+  border-radius: 13px;
+}
+#vodTitle {
+  font-size: clamp(20px, 2.5vw, 29px);
+  overflow-wrap: anywhere;
+}
+.vod-episodes {
+  max-height: 330px;
+  overflow: auto;
+  align-items: start;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.vod-episodes button {
+  padding: 6px 11px;
+}
+.vod-source {
+  padding: 14px 0;
+  border-top: 1px solid #e2e2dc;
+}
+.vod-source h3 {
+  margin: 0;
+}
+.vod-source small {
+  display: block;
+}
+.vod-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #f6f6f3;
+}
+.vod-source-row input,
+.vod-panel input[type="checkbox"] {
+  accent-color: #ce3d31;
+  width: 17px;
+  height: 17px;
+}
+#vodAddForm {
+  border-top: 1px solid #e2e2dc;
+  padding-top: 14px;
+}
+#vodAddForm .vod-import {
+  margin: 7px 0;
+}
+.vod-panel .between {
+  gap: 8px;
+}
+@media (max-width: 760px) {
+  .vod-watch-grid,
+  .vod-settings-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .vod-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .vod-cover {
+    aspect-ratio: 3/3.65;
+  }
+  .vod-panel {
+    padding: 15px;
+  }
+  #vodResume {
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  #vodResume small {
+    width: 100%;
+  }
+  #vodResume strong {
+    font-size: 17px;
+  }
+  #vodResume span {
+    font-size: 12px;
+  }
+  #vodSearchForm {
+    margin-bottom: 13px;
+  }
+  .vod-list-heading h2 {
+    font-size: 19px;
+  }
+  header nav {
+    justify-content: space-between;
+    gap: 4px;
+  }
+  header nav button {
+    white-space: nowrap;
+    padding-inline: 5px;
+  }
+  #vodPage .headline {
+    gap: 8px;
+  }
+  .vod-episodes {
+    max-height: 200px;
+  }
+}
+
+.vod-source-row .vod-buttons {
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.vod-source-row .outline {
+  padding: 4px 9px;
+  font-size: 12px;
+}

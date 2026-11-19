@@ -1,7 +1,7 @@
 mod deep_check;
 use freetv_core::network::{ProxySettings, Routing, Traffic};
 use freetv_core::relay::Relay;
-use freetv_core::{catalog, checker, network};
+use freetv_core::{catalog, checker, network, vod};
 use std::{
     io::Write,
     path::PathBuf,
@@ -21,7 +21,7 @@ impl Engine {
     fn client(&self, traffic: Traffic) -> reqwest::Client {
         self.routing.read().unwrap().client(traffic)
     }
-    async fn playback_url(&self, url: &str, radio: bool, playlist: bool) -> Result<String, String> {
+    async fn playback_url(&self, url: &str, scope: &str, playlist: bool) -> Result<String, String> {
         let url = network::web_url(url)?;
         if self.routing.read().unwrap().settings.system {
             return Ok(url.to_string());
@@ -30,7 +30,7 @@ impl Engine {
             .relay
             .get_or_try_init(|| Relay::start(self.routing.clone()))
             .await?;
-        Ok(relay.url(&url, radio, playlist))
+        Ok(relay.url(&url, scope, playlist))
     }
 }
 
@@ -75,10 +75,18 @@ fn save_proxy(
 async fn playback_url(
     url: String,
     radio: bool,
+    vod: Option<bool>,
     playlist: bool,
     engine: State<'_, Engine>,
 ) -> Result<String, String> {
-    engine.playback_url(&url, radio, playlist).await
+    let scope = if vod.unwrap_or(false) {
+        "vod"
+    } else if radio {
+        "radio"
+    } else {
+        "tv"
+    };
+    engine.playback_url(&url, scope, playlist).await
 }
 
 #[tauri::command]
@@ -107,6 +115,38 @@ async fn radio_stations(
 }
 
 #[tauri::command]
+async fn vod_catalog(
+    api: String,
+    query: String,
+    page: u32,
+    engine: State<'_, Engine>,
+) -> Result<vod::Page, String> {
+    vod::catalog(&engine.client(Traffic::VodList), &api, &query, page).await
+}
+#[tauri::command]
+async fn vod_detail(
+    api: String,
+    id: String,
+    engine: State<'_, Engine>,
+) -> Result<vod::Film, String> {
+    vod::detail(&engine.client(Traffic::VodList), &api, &id).await
+}
+#[tauri::command]
+async fn vod_sources(
+    address: String,
+    engine: State<'_, Engine>,
+) -> Result<Vec<vod::Source>, String> {
+    vod::sources(&engine.client(Traffic::VodList), &address).await
+}
+#[tauri::command]
+async fn vod_poster(
+    url: String,
+    engine: State<'_, Engine>,
+) -> Result<tauri::ipc::Response, String> {
+    let data = network::get(&engine.client(Traffic::VodList), &url, 4 << 20).await?;
+    Ok(tauri::ipc::Response::new(data))
+}
+#[tauri::command]
 async fn subscription(
     source: usize,
     engine: State<'_, Engine>,
@@ -126,9 +166,12 @@ async fn media(
     url: String,
     range: Option<(u64, Option<u64>)>,
     radio: Option<bool>,
+    vod: Option<bool>,
     engine: State<'_, Engine>,
 ) -> Result<tauri::ipc::Response, String> {
-    let traffic = if radio.unwrap_or(false) {
+    let traffic = if vod.unwrap_or(false) {
+        Traffic::VodPlay
+    } else if radio.unwrap_or(false) {
         Traffic::RadioPlay
     } else {
         Traffic::TvPlay
@@ -204,6 +247,10 @@ pub fn run() {
             deep_check::decode_route,
             radio_stations,
             native_radio,
+            vod_catalog,
+            vod_detail,
+            vod_sources,
+            vod_poster,
             playback_url,
             proxy_settings,
             save_proxy,

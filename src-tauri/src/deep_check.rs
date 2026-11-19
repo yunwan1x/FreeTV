@@ -145,6 +145,6 @@ pub async fn decode_route(
     path: Option<String>,
     engine: tauri::State<'_, crate::Engine>,
 ) -> Result<(), String> {
-    let local = engine.playback_url(&url, false, false).await?;
+    let local = engine.playback_url(&url, "tv", false).await?;
     desktop::decode(local, path).await
 }

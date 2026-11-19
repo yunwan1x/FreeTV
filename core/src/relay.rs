@@ -80,8 +80,7 @@ impl Relay {
         });
         Ok(relay)
     }
-    pub fn url(&self, url: &Url, radio: bool, playlist: bool) -> String {
-        let scope = if radio { "radio" } else { "tv" };
+    pub fn url(&self, url: &Url, scope: &str, playlist: bool) -> String {
         let ext = if playlist {
             "m3u8"
         } else {
@@ -95,11 +94,11 @@ impl Relay {
         let sig = B64.encode(hmac::sign(&self.key, resource.as_bytes()).as_ref());
         format!("http://127.0.0.1:{}/{sig}/{resource}", self.port)
     }
-    fn rewrite(&self, text: &str, base: &Url, radio: bool) -> Result<String, StatusCode> {
+    fn rewrite(&self, text: &str, base: &Url, scope: &str) -> Result<String, StatusCode> {
         let link = |v: &str| {
             let target = base.join(v).map_err(|_| StatusCode::BAD_GATEWAY)?;
             network::web_url(target.as_str()).map_err(|_| StatusCode::BAD_GATEWAY)?;
-            Ok::<_, StatusCode>(self.url(&target, radio, false))
+            Ok::<_, StatusCode>(self.url(&target, scope, false))
         };
         let mut output = String::new();
         for line in text.lines() {
@@ -134,17 +133,18 @@ impl Relay {
         hmac::verify(&self.key, payload.as_bytes(), &signature)
             .map_err(|_| StatusCode::NOT_FOUND)?;
         let mut parts = payload.split('/');
-        let radio = parts.next() == Some("radio");
+        let scope = parts.next().ok_or(StatusCode::NOT_FOUND)?;
         let raw = B64
             .decode(parts.next().ok_or(StatusCode::NOT_FOUND)?)
             .map_err(|_| StatusCode::BAD_REQUEST)?;
         let target =
             network::web_url(std::str::from_utf8(&raw).map_err(|_| StatusCode::BAD_REQUEST)?)
                 .map_err(|_| StatusCode::BAD_REQUEST)?;
-        let traffic = if radio {
-            Traffic::RadioPlay
-        } else {
-            Traffic::TvPlay
+        let traffic = match scope {
+            "tv" => Traffic::TvPlay,
+            "radio" => Traffic::RadioPlay,
+            "vod" => Traffic::VodPlay,
+            _ => return Err(StatusCode::NOT_FOUND),
         };
         let client = self.routing.read().unwrap().client(traffic);
         let mut upstream = client.request(req.method().clone(), target);
@@ -194,7 +194,7 @@ impl Relay {
                 .trim_start_matches('\u{feff}');
             return out
                 .header(header::CONTENT_TYPE, "application/vnd.apple.mpegurl")
-                .body(full(self.rewrite(manifest, &base, radio)?))
+                .body(full(self.rewrite(manifest, &base, scope)?))
                 .map_err(|_| StatusCode::BAD_GATEWAY);
         }
         for name in [
@@ -269,6 +269,7 @@ mod tests {
             address: http,
             tv_play: true,
             radio_list: true,
+            vod_play: true,
             ..Default::default()
         })
         .unwrap();
@@ -277,6 +278,8 @@ mod tests {
             (Traffic::TvList, "direct"),
             (Traffic::RadioList, "via HTTP proxy"),
             (Traffic::RadioPlay, "direct"),
+            (Traffic::VodPlay, "via HTTP proxy"),
+            (Traffic::VodList, "direct"),
         ] {
             assert_eq!(
                 route
@@ -293,35 +296,38 @@ mod tests {
         }
         let relay = Relay::start(Arc::new(RwLock::new(route))).await.unwrap();
         let plain = reqwest::Client::builder().no_proxy().build().unwrap();
-        let manifest = relay.url(
-            &Url::parse(&format!("{origin}/sub/live.m3u8")).unwrap(),
-            false,
-            true,
-        );
-        let body = plain
-            .get(&manifest)
-            .send()
-            .await
-            .unwrap()
-            .text()
-            .await
-            .unwrap();
-        let key = ATTR.captures(&body).unwrap()[1].to_owned();
-        for link in [key.as_str(), body.lines().last().unwrap()] {
-            assert!(link.starts_with("http://127.0.0.1:"));
-            assert_eq!(
-                plain.get(link).send().await.unwrap().text().await.unwrap(),
-                "via HTTP proxy"
+        for scope in ["tv", "vod"] {
+            let manifest = relay.url(
+                &Url::parse(&format!("{origin}/sub/live.m3u8")).unwrap(),
+                scope,
+                true,
             );
-            assert_eq!(
-                plain
-                    .get(link.replace("/tv/", "/radio/"))
-                    .send()
-                    .await
-                    .unwrap()
-                    .status(),
-                StatusCode::NOT_FOUND
-            );
+            let body = plain
+                .get(&manifest)
+                .send()
+                .await
+                .unwrap()
+                .text()
+                .await
+                .unwrap();
+            let key = ATTR.captures(&body).unwrap()[1].to_owned();
+            for link in [key.as_str(), body.lines().last().unwrap()] {
+                assert!(link.starts_with("http://127.0.0.1:"));
+                assert!(link.contains(&format!("/{scope}/")));
+                assert_eq!(
+                    plain.get(link).send().await.unwrap().text().await.unwrap(),
+                    "via HTTP proxy"
+                );
+                assert_eq!(
+                    plain
+                        .get(link.replace(&format!("/{scope}/"), "/radio/"))
+                        .send()
+                        .await
+                        .unwrap()
+                        .status(),
+                    StatusCode::NOT_FOUND
+                );
+            }
         }
     }
 

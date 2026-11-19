@@ -4,3 +4,4 @@ pub mod guide;
 pub mod network;
 pub mod radio;
 pub mod relay;
+pub mod vod;
