@@ -85,11 +85,11 @@ mod desktop {
         let mut cmd = Command::new(path);
         #[cfg(windows)]
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-        cmd.env_remove("http_proxy")
-            .env_remove("HTTP_PROXY")
-            .env_remove("all_proxy")
-            .env_remove("ALL_PROXY")
-            .kill_on_drop(true)
+        if url.host_str() == Some("127.0.0.1") {
+            cmd.env("no_proxy", "127.0.0.1")
+                .env("NO_PROXY", "127.0.0.1");
+        }
+        cmd.kill_on_drop(true)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

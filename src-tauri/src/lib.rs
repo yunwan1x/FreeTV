@@ -23,6 +23,9 @@ impl Engine {
     }
     async fn playback_url(&self, url: &str, radio: bool, playlist: bool) -> Result<String, String> {
         let url = network::web_url(url)?;
+        if self.routing.read().unwrap().settings.system {
+            return Ok(url.to_string());
+        }
         let relay = self
             .relay
             .get_or_try_init(|| Relay::start(self.routing.clone()))
@@ -161,7 +164,10 @@ pub fn run() {
             let path = app.path().app_config_dir()?.join("proxy.json");
             let settings = match std::fs::read(&path) {
                 Ok(data) => serde_json::from_slice(&data)?,
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => ProxySettings::default(),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => ProxySettings {
+                    system: true,
+                    ..Default::default()
+                },
                 Err(e) => return Err(e.into()),
             };
             app.manage(Engine {

@@ -1372,6 +1372,7 @@ footer button {
   display: grid;
   gap: 8px;
 }
+.proxy-form > label select,
 .proxy-form > label input {
   border: 1px solid #d6d5cf;
   border-radius: 7px;

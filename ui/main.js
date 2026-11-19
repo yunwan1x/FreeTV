@@ -547,14 +547,25 @@ async function openProxy() {
   submit.disabled = true;
   try {
     const config = await invoke("proxy_settings");
+    form.elements.mode.value = config.system ? "system" : "custom";
     form.elements.address.value = config.address;
+    const setMode = () => {
+      const system = form.elements.mode.value === "system";
+      form.elements.address.disabled = system;
+      form.querySelector("fieldset").disabled = system;
+    };
+    form.elements.mode.onchange = setMode;
+    setMode();
     const flags = [...form.querySelectorAll("[type=checkbox]")];
     for (const flag of flags) flag.checked = config[flag.name];
     submit.disabled = false;
     form.onsubmit = async (event) => {
       event.preventDefault();
       submit.disabled = true;
-      const settings = { address: form.elements.address.value.trim() };
+      const settings = {
+        system: form.elements.mode.value === "system",
+        address: form.elements.address.value.trim(),
+      };
       for (const flag of flags) settings[flag.name] = flag.checked;
       try {
         await invoke("save_proxy", { settings });

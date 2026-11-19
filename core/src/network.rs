@@ -13,6 +13,7 @@ pub enum Traffic {
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProxySettings {
+    pub system: bool,
     pub address: String,
     pub tv_list: bool,
     pub tv_play: bool,
@@ -34,10 +35,17 @@ impl Routing {
                 .user_agent(concat!("FreeTV/", env!("CARGO_PKG_VERSION")))
                 .connect_timeout(Duration::from_secs(7))
                 .read_timeout(Duration::from_secs(30))
-                .no_proxy()
         };
-        let direct = builder().build().map_err(|_| "无法初始化网络")?;
-        let proxy = if settings.address.is_empty() {
+        let direct = if settings.system {
+            builder()
+        } else {
+            builder().no_proxy()
+        }
+        .build()
+        .map_err(|_| "无法初始化网络")?;
+        let proxy = if settings.system {
+            None
+        } else if settings.address.is_empty() {
             if settings.tv_list || settings.tv_play || settings.radio_list || settings.radio_play {
                 return Err("请先填写代理地址".into());
             }
@@ -77,7 +85,7 @@ impl Routing {
             Traffic::RadioList => s.radio_list,
             Traffic::RadioPlay => s.radio_play,
         };
-        if enabled {
+        if enabled && !s.system {
             self.proxy.as_ref().expect("validated proxy")
         } else {
             &self.direct
