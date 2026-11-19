@@ -68,18 +68,21 @@ def test(folder):
     wait(target)
     ws = websocket.create_connection(target(), timeout=10, suppress_origin=True)
     sequence = 0
-    def evaluate(expression):
+    def command(method, params):
         nonlocal sequence
         sequence += 1
-        ws.send(json.dumps({"id": sequence, "method": "Runtime.evaluate",
-                            "params": {"expression": expression, "returnByValue": True, "userGesture": True}}))
+        ws.send(json.dumps({"id": sequence, "method": method, "params": params}))
         while True:
             message = json.loads(ws.recv())
             if message.get("id") == sequence:
-                result = message["result"]
-                if "exceptionDetails" in result:
-                    raise AssertionError(result["exceptionDetails"])
-                return result["result"].get("value")
+                if "error" in message:
+                    raise AssertionError(message["error"])
+                return message["result"]
+    def evaluate(expression):
+        result = command("Runtime.evaluate", {"expression": expression, "returnByValue": True, "userGesture": True})
+        if "exceptionDetails" in result:
+            raise AssertionError(result["exceptionDetails"])
+        return result["result"].get("value")
     station = {"stationuuid":"screen-off-test","name":"Screen-off test","countrycode":"GB",
                "url":"http://127.0.0.1:8791/radio.wav","url_resolved":"","hls":0,"codec":"PCM","language":""}
     try:
@@ -93,9 +96,19 @@ def test(folder):
     seed = {"radio-favorites": [[station["stationuuid"], station]],
             **{f"feed-{i}": {"channels": [channel] if i == 0 else [],
                              "updated": int(time.time() * 1000)} for i in range(3)}}
-    evaluate("for(const [k,v] of Object.entries(" + json.dumps(seed) +
-             ")) localStorage.setItem(k,JSON.stringify(v));location.reload()")
-    wait(lambda: evaluate("document.querySelector('.screen h2')?.textContent==='PiP test'"))
+    seed["auto-sync"] = False
+    seed["lastChannel"] = channel["id"]
+    command("Page.enable", {})
+    command("Page.addScriptToEvaluateOnNewDocument", {"source":
+        "for(const [k,v] of Object.entries(" + json.dumps(seed) +
+        "))localStorage.setItem(k,JSON.stringify(v));window.__fixture=true;"})
+    command("Page.reload", {"ignoreCache": True})
+    try:
+        wait(lambda: evaluate("window.__fixture===true && !!document.querySelector('#radioNav')?.onclick"))
+    except AssertionError:
+        print("Fixture state:", evaluate("[location.href,document.readyState,window.__fixture,document.body?.innerText.slice(0,600)]"), file=sys.stderr)
+        raise
+    print("Test page ready:", evaluate("[location.href,document.querySelector('#now')?.innerText,localStorage.getItem('lastChannel')]"), flush=True)
     evaluate("document.querySelector('#radioNav').click();document.querySelector('#radioFavs').click()")
     wait(lambda: evaluate("!!document.querySelector('.radio-station')"))
     evaluate("document.querySelector('.radio-station').click()")
@@ -117,7 +130,9 @@ def test(folder):
     print("Verified native playback, foreground service, screen-off playback and media-key pause/resume.")
     adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
     adb("shell", "wm", "dismiss-keyguard")
-    evaluate("document.querySelector('#home').click();document.querySelector('.screen-play').click()")
+    evaluate("document.querySelector('#home').click()")
+    print("TV state:", evaluate("[document.querySelector('#now')?.innerText,document.querySelector('#channels')?.innerText.slice(0,240)]"), flush=True)
+    evaluate("document.querySelector('#channels [data-i=pip-test]').click()")
     wait(lambda: evaluate("document.querySelector('.screen video').currentTime > 1"))
     evaluate("document.querySelector('#fullscreen').click()")
     wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
