@@ -231,23 +231,21 @@ export function setupVod(read, write) {
   function drawFilters() {
     const entries = enabled();
     if (filter && !entries.some((s) => s.id === filter)) filter = "";
-    $("vodFilters").replaceChildren(
-      ...[{ id: "", name: "全部来源" }, ...entries].map((s) => {
-        const b = element("button", s.name, "outline");
-        b.setAttribute("aria-pressed", String(filter === s.id));
-        b.onclick = () => {
-          filter = s.id;
-          savedOnly = false;
-          load();
-        };
-        return b;
-      }),
+    const select = $("vodFilters");
+    select.replaceChildren(
+      new Option("全部来源（" + entries.length + "）", ""),
+      ...entries.map((s) => new Option(s.name, s.id)),
     );
+    select.value = filter;
   }
+  $("vodFilters").onchange = (e) => {
+    filter = e.target.value;
+    savedOnly = false;
+    load();
+  };
   function drawCards() {
     if (view !== "browse" || !visible) return;
     covers.reset();
-    drawFilters();
     $("vodListTitle").textContent = savedOnly
       ? "我的片单"
       : query
@@ -315,16 +313,19 @@ export function setupVod(read, write) {
     const failures = [...results.values()]
       .filter((p) => p.error)
       .map((p) => p.name + "：" + p.error);
+    const failedStatus = filter
+      ? failures[0]
+      : [films.length ? "" : "未找到匹配影片。", failures.length + " 个来源读取失败，可在点播设置中查看。"].join("");
     const status = savedOnly
       ? films.length
         ? ""
         : "片单为空，在播放页可收藏影片。"
       : busy
-        ? "正在读取片库…"
+        ? "正在读取片库 · " + results.size + " 个来源"
         : !enabled().length
           ? "请在点播设置中启用来源。"
           : failures.length
-            ? failures.join("；")
+            ? failedStatus
             : films.length
               ? ""
               : "未找到匹配的影片。";

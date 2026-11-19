@@ -45,22 +45,35 @@ export function setupVodSettings(read, write, changed) {
   const save = () => write("vod-settings-v1", prefs);
   function groups() {
     const synced = prefs.groups.find((g) => g.address === directory);
+    const custom = prefs.groups.filter((g) => g.address !== directory);
+    // Keep existing custom source IDs (including favorites and opt-outs) on overlap.
+    const customApis = new Set(
+      custom.flatMap((g) => g.sources.map((s) => s.api)),
+    );
+    const seedKeys = new Set(builtin.map((s) => s.key));
+    const discovered = (synced?.sources || []).filter(
+      (s) => !seedKeys.has(s.key) && !customApis.has(s.api) && s.api !== mediathek,
+    );
     return [
       {
         address: directory,
-        name: "精选中文源",
+        name: "LunaTV 点播源集合",
+        needsDiscovery: !synced?.fullDirectory,
         updated: synced?.updated,
-        sources: builtin.map((s) => ({
-          ...s,
-          api: synced?.sources.find((v) => v.key === s.key)?.api || s.api,
-        })),
+        sources: [
+          ...builtin.map((s) => ({
+            ...s,
+            api: synced?.sources.find((v) => v.key === s.key)?.api || s.api,
+          })),
+          ...discovered,
+        ],
       },
       {
         address: "international",
         name: "国际公共媒体",
         sources: [international],
       },
-      ...prefs.groups.filter((g) => g.address !== directory),
+      ...custom,
     ];
   }
   function sources() {
@@ -147,7 +160,8 @@ export function setupVodSettings(read, write, changed) {
         const head = document.createElement("div");
         head.className = "between";
         const title = document.createElement("h3");
-        title.textContent = g.name;
+        const entries = all.filter((s) => s.group === g.address);
+        title.textContent = g.name + " · " + entries.length + " 个源";
         head.append(title);
         if (g.address !== "international") {
           const tools = document.createElement("div");
@@ -179,7 +193,7 @@ export function setupVodSettings(read, write, changed) {
               ? "德国及欧洲公共广播机构节目"
               : "尚未同步");
         card.append(head, note);
-        for (const s of all.filter((s) => s.group === g.address)) {
+        for (const s of entries) {
           const row = document.createElement("div");
           row.className = "vod-source-row";
           const label = document.createElement("span"),
@@ -237,23 +251,19 @@ export function setupVodSettings(read, write, changed) {
     errors.delete(address);
     render();
     try {
-      let list = await invoke("vod_sources", { address });
-      if (address === directory) {
-        const prev = groups()[0].sources;
-        const matches = builtin.filter((s) =>
-          list.some((v) => v.key === s.key),
-        );
-        if (!matches.length) throw Error("上游未返回精选源，已沿用原地址");
-        const updated = prev.map((s) => {
-          const match = list.find((v) => v.key === s.key);
-          return { key: s.key, name: s.name, api: match?.api || s.api };
-        });
-        if (matches.length < builtin.length)
-          errors.set(address, "部分源未返回，已沿用旧地址");
-        list = updated;
-      }
+      const list = await invoke("vod_sources", { address });
       if (!adding && !groups().some((g) => g.address === address)) return;
       const next = { address, name, sources: list, updated: Date.now() };
+      if (address === directory) {
+        next.fullDirectory = true;
+        // Preserve last-known URLs for bundled fallback sources absent in this snapshot.
+        const keys = new Set(list.map((s) => s.key));
+        const previous = groups()[0].sources;
+        for (const seed of builtin) {
+          if (!keys.has(seed.key))
+            next.sources.push(previous.find((s) => s.key === seed.key));
+        }
+      }
       const index = prefs.groups.findIndex((g) => g.address === address);
       if (index < 0) prefs.groups.push(next);
       else prefs.groups[index] = next;
@@ -277,7 +287,9 @@ export function setupVodSettings(read, write, changed) {
         .filter(
           (g) =>
             g.address !== "international" &&
-            (!staleOnly || Date.now() - (g.updated || 0) > 86400000),
+            (!staleOnly ||
+              g.needsDiscovery ||
+              Date.now() - (g.updated || 0) > 86400000),
         )
         .map((g) => syncGroup(g.address, g.name)),
     );
@@ -285,6 +297,7 @@ export function setupVodSettings(read, write, changed) {
   $("vodAuto").onchange = (e) => {
     prefs.auto = e.target.checked;
     save();
+    if (prefs.auto) refresh(true);
   };
   $("vodSyncAll").onclick = () => refresh();
   $("vodAddForm").onsubmit = (e) => {

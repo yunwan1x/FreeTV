@@ -16,7 +16,7 @@
           <div class="brand"><i class="logo"></i>FreeTV</div>
           <nav>
             <button id="home" class="active">电视直播</button
-            ><button id="vodNav">影视点播</button
+            ><button id="vodNav">点播</button
             ><button id="radioNav">全球电台</button
             ><button id="favorites">我的收藏</button>
           </nav>
@@ -107,15 +107,15 @@
     <main id="vodPage" hidden>
       <section id="vodBrowse">
         <div class="between headline">
-          <h1>影视点播</h1>
+          <h1>点播</h1>
           <button class="outline vod-settings-link">点播设置</button>
         </div>
         <form id="vodSearchForm">
           <input
             type="search"
             id="vodQuery"
-            aria-label="搜索影片或剧名"
-            placeholder="搜索影片或剧名"
+            aria-label="搜索视频名称"
+            placeholder="搜索视频名称"
           /><button class="vod-primary">搜索</button>
         </form>
         <button id="vodResume" hidden></button>
@@ -126,7 +126,7 @@
             ><button class="outline" id="vodRefresh">刷新</button>
           </div>
         </div>
-        <div class="vod-filters" id="vodFilters"></div>
+        <label class="vod-filters">搜索范围 <select id="vodFilters" aria-label="筛选点播来源"></select></label>
         <p id="vodMessage" role="status"></p>
         <div class="vod-cards" id="vodCards"></div>
         <button class="outline" id="vodMore" hidden>更多影片</button>
@@ -178,8 +178,9 @@
               ><input
                 type="checkbox"
                 id="vodAuto"
-              />打开点播时同步超过一天的订阅</label
+              />打开点播时自动发现新源，每天更新订阅</label
             >
+            <p>首次打开会读取内置点播源集合，新源自动加入搜索。可在下方关闭单个来源。</p>
             <div id="vodSources"></div>
             <div id="vodProbeHost"></div>
             <form id="vodAddForm">

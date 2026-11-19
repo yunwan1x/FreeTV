@@ -50,7 +50,15 @@
 .vod-filters {
   margin: 10px 0 16px;
 }
-.vod-filters button[aria-pressed="true"],
+.vod-filters select {
+  max-width: 75%;
+  border: 1px solid #d8d6d1;
+  border-radius: 7px;
+  background: white;
+  padding: 6px 10px;
+  font: inherit;
+}
+
 .vod-episodes button[aria-pressed="true"],
 #vodBookmarks[aria-pressed="true"] {
   color: #a22c24;
