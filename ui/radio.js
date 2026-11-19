@@ -2,6 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { countryPicker, radioCountries } from "./country-picker.js";
 import { Player } from "./player.js";
 
+import bundledStations from "./defaults/radio.json";
+
 const el = (id) => document.getElementById(id);
 const stateLabels = {
   idle: "已停止",
@@ -33,6 +35,7 @@ export function setupRadio(read, write, stopTV) {
     favoritesOnly = false,
     visible = false,
     loading = false,
+    usingDefaults = false,
     next = null;
   let searchVersion = 0,
     playVersion = 0,
@@ -222,7 +225,13 @@ export function setupRadio(read, write, stopTV) {
     const version = ++searchVersion;
     loading = true;
     if (!offset) {
-      stations = [];
+      usingDefaults = true;
+      const name = filters.name.trim().toLowerCase();
+      const language = filters.language.trim().toLowerCase();
+      stations = bundledStations.filter((s) =>
+        !filters.tag && (!filters.country || s.countrycode === filters.country) &&
+        s.name.toLowerCase().includes(name) && s.language.toLowerCase().includes(language),
+      );
       next = null;
     }
     el("radioListTitle").textContent = Object.values(filters).some(Boolean)
@@ -234,14 +243,17 @@ export function setupRadio(read, write, stopTV) {
       const page = await invoke("radio_stations", { ...filters, offset });
       if (version !== searchVersion) return;
       const merged = new Map(
-        [...stations, ...page.stations].map((s) => [s.stationuuid, s]),
+        (offset ? [...stations, ...page.stations] : page.stations).map((s) => [s.stationuuid, s]),
       );
       stations = [...merged.values()];
+      usingDefaults = false;
       next = page.next;
       el("radioMessage").textContent = stations.length ? "" : "没有匹配的电台";
     } catch (error) {
       if (version === searchVersion)
-        el("radioMessage").textContent = String(error);
+        el("radioMessage").textContent = !offset && stations.length
+          ? "电台目录更新失败，显示内置电台。"
+          : String(error);
     } finally {
       if (version === searchVersion) {
         loading = false;
@@ -291,7 +303,7 @@ export function setupRadio(read, write, stopTV) {
       visible = true;
       drawPlayer();
       drawList();
-      if (!stations.length && !loading && !favoritesOnly) search();
+      if ((!stations.length || usingDefaults) && !loading && !favoritesOnly) search();
       if (selection) {
         const version = playVersion;
         restoring = true;

@@ -9,6 +9,7 @@ import { previewFirstFrame } from "./player.js";
 import checkerNotice from "../licenses/iptv-checker-rs.txt?raw";
 import hlsNotice from "../node_modules/hls.js/LICENSE?raw";
 import apacheLicense from "../node_modules/@tauri-apps/api/LICENSE-APACHE-2.0?raw";
+import bundledChannels from "./defaults/tv.json";
 import "./style.css";
 
 const $ = (id) => document.getElementById(id);
@@ -62,7 +63,13 @@ const action = (name, text, cls = "", i = "") =>
   '">' +
   text +
   "</button>";
-let feeds = feedNames.map((_, i) => read("feed-" + i, null));
+const feeds = feedNames.map((_, i) => {
+  const cached = read("feed-" + i, null);
+  return cached?.channels?.length ? cached : {
+    channels: bundledChannels.filter((channel) => channel.feed === i),
+    updated: 0,
+  };
+});
 const feedErrors = [];
 const pendingSources = new Set();
 let syncMessage = "";
@@ -490,13 +497,13 @@ function renderSources() {
         .map((i) => {
           const feed = feeds[i];
           const saved = feed
-            ? feed.channels.length +
-              " 个频道 · 上次成功 " +
-              new Date(feed.updated).toLocaleString("zh-CN")
+            ? feed.channels.length + " 个频道 · " + (feed.updated
+              ? "上次成功 " + new Date(feed.updated).toLocaleString("zh-CN")
+              : "内置目录")
             : "尚未载入";
           const error = feedErrors[i]
             ? '<small class="error">同步失败' +
-              (feed ? "，已沿用上次列表" : "") +
+              (feed ? "，当前目录可继续使用" : "") +
               " · " +
               escape(feedErrors[i]) +
               "</small>"

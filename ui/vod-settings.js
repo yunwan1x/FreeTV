@@ -1,6 +1,8 @@
 import { previewFirstFrame } from "./player.js";
 import { invoke } from "@tauri-apps/api/core";
 
+import bundledSources from "./defaults/vod-sources.json";
+
 const directory =
   "https://raw.githubusercontent.com/hafrey1/LunaTV-config/main/jin18.json";
 const builtin = [
@@ -60,7 +62,8 @@ export function setupVodSettings(read, write, changed) {
       custom.flatMap((g) => g.sources.map((s) => s.api)),
     );
     const seedKeys = new Set(builtin.map((s) => s.key));
-    const discovered = (synced?.sources || []).filter(
+    const directorySources = synced?.fullDirectory ? synced.sources : bundledSources;
+    const discovered = directorySources.filter(
       (s) => !seedKeys.has(s.key) && !customApis.has(s.api) && !international.some((v) => v.api === s.api),
     );
     return [
@@ -200,7 +203,7 @@ export function setupVodSettings(read, write, changed) {
             ? "最近同步 " + new Date(g.updated).toLocaleString("zh-CN")
             : g.address === "international"
               ? "跨站视频搜索、数字馆藏和欧洲公共广播节目"
-              : "尚未同步");
+              : g.address === directory ? "内置目录，联网后自动更新" : "尚未同步");
         card.append(head, note);
         for (const s of entries) {
           const row = document.createElement("div");

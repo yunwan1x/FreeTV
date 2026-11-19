@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { Player } from "./player.js";
 import { setupVodSettings, mediathek } from "./vod-settings.js";
+import bundledFilms from "./defaults/vod-films.json";
 import "./vod.css";
 
 const $ = (id) => document.getElementById(id);
@@ -412,9 +413,14 @@ export function setupVod(read, write) {
       .filter((s) => !filter || s.id === filter)
       .sort((a, b) => Number(b.group === "international") - Number(a.group === "international"));
     busy = true;
-    for (const s of sources)
-      if (!results.has(s.id))
-        results.set(s.id, { films: [], page: 0, more: true, name: s.name });
+    const term = query.trim().toLowerCase();
+    for (const s of sources) {
+      if (results.has(s.id)) continue;
+      const films = bundledFilms.filter((f) =>
+        f.source === s.id && f.title.toLowerCase().includes(term),
+      );
+      results.set(s.id, { films, page: 0, more: true, name: s.name });
+    }
     drawCards();
     async function fetchPage(s) {
       const entry = results.get(s.id);
@@ -426,7 +432,9 @@ export function setupVod(read, write) {
           page: entry.page + 1,
         });
         if (stamp !== catalogEpoch) return;
-        entry.films.push(...page.films.map((f) => ({ ...f, source: s.id })));
+        const films = page.films.map((f) => ({ ...f, source: s.id }));
+        if (entry.page === 0) entry.films = films;
+        else entry.films.push(...films);
         entry.page++;
         entry.more = page.more;
         entry.error = "";
