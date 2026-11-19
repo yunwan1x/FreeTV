@@ -326,7 +326,69 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn http_credentials_only_reach_the_selected_proxy() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let expected = format!(
+            "proxy-authorization: Basic {}",
+            base64::engine::general_purpose::STANDARD.encode("name:p@ss:%2F中")
+        );
+        let server = tokio::spawn(async move {
+            for proxied in [true, false] {
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut socket = BufReader::new(socket);
+                let mut headers = String::new();
+                let mut line = String::new();
+                while socket.read_line(&mut line).await.unwrap() > 0 && line != "\r\n" {
+                    headers.push_str(&line);
+                    line.clear();
+                }
+                assert_eq!(
+                    headers
+                        .lines()
+                        .any(|line| line.eq_ignore_ascii_case(&expected)),
+                    proxied
+                );
+                assert_eq!(
+                    headers.to_lowercase().contains("proxy-authorization:"),
+                    proxied
+                );
+                socket
+                    .get_mut()
+                    .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 0\r\n\r\n")
+                    .await
+                    .unwrap();
+            }
+        });
+        let route = Routing::new(ProxySettings {
+            address: format!("http://name:p%40ss%3A%252F%E4%B8%AD@{addr}"),
+            tv_play: true,
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(!route.settings.address.contains('@'));
+        route
+            .client(Traffic::TvPlay)
+            .get("http://tv.invalid/")
+            .send()
+            .await
+            .unwrap();
+        route
+            .client(Traffic::RadioPlay)
+            .get(format!("http://{addr}/direct"))
+            .send()
+            .await
+            .unwrap();
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
     async fn socks5h_resolves_at_proxy() {
+        for authenticate in [false, true] {
+            verify_socks5h(authenticate).await;
+        }
+    }
+    async fn verify_socks5h(authenticate: bool) {
         let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = format!("socks5h://{}", proxy.local_addr().unwrap());
         let server = tokio::spawn(async move {
@@ -334,7 +396,19 @@ mod tests {
             assert_eq!(socket.read_u8().await.unwrap(), 5);
             let n = socket.read_u8().await.unwrap();
             socket.read_exact(&mut vec![0; n as usize]).await.unwrap();
-            socket.write_all(&[5, 0]).await.unwrap();
+            if authenticate {
+                socket.write_all(&[5, 2]).await.unwrap();
+                assert_eq!(socket.read_u8().await.unwrap(), 1);
+                for expected in [b"user".as_slice(), b"p@%2F:/"] {
+                    let size = socket.read_u8().await.unwrap();
+                    let mut received = vec![0; size as usize];
+                    socket.read_exact(&mut received).await.unwrap();
+                    assert_eq!(received, expected);
+                }
+                socket.write_all(&[1, 0]).await.unwrap();
+            } else {
+                socket.write_all(&[5, 0]).await.unwrap();
+            }
             let mut command = [0; 4];
             socket.read_exact(&mut command).await.unwrap();
             assert_eq!(command, [5, 1, 0, 3]);
@@ -356,6 +430,8 @@ mod tests {
         });
         let route = Routing::new(ProxySettings {
             address,
+            username: if authenticate { "user" } else { "" }.into(),
+            password: if authenticate { "p@%2F:/" } else { "" }.into(),
             radio_play: true,
             ..Default::default()
         })

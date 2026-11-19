@@ -1035,7 +1035,7 @@ footer button {
   font-size: 13px;
   color: #dadbda;
 }
-.country-filter select {
+.country-filter input {
   min-width: 0;
   flex: 1;
   font: inherit;
@@ -1309,7 +1309,7 @@ footer button {
   .chanbox .country-filter {
     color: #57554f;
   }
-  .country-filter select {
+  .country-filter input {
     color-scheme: light;
     background: #faf9f7;
     border-color: #dedcd5;
@@ -1433,4 +1433,52 @@ footer button {
   .layout-picker button {
     padding-inline: 9px;
   }
+}
+
+.country-combo {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+.country-combo input,
+#radioFilters .country-combo input {
+  width: 100%;
+  min-width: 0;
+  padding-right: 32px;
+}
+#radioFilters .country-combo {
+  min-width: 135px;
+}
+.country-combo button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 32px;
+  color: inherit;
+}
+.country-options {
+  position: fixed;
+  overflow-y: auto;
+  z-index: 35;
+  padding: 4px;
+  background: white;
+  color: #242321;
+  border: 1px solid #d6d5cf;
+  border-radius: 7px;
+  box-shadow: 0 5px 18px #20202026;
+  font-size: 14px;
+}
+.country-options [role="option"] {
+  padding: 7px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.country-options [aria-selected="true"] {
+  font-weight: 650;
+}
+.country-options .highlight,
+.country-options [role="option"]:hover {
+  background: #fcece8;
+  color: #923025;
 }

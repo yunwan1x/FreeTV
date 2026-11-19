@@ -35,14 +35,32 @@ impl Engine {
 }
 
 #[tauri::command]
-fn proxy_settings(engine: State<'_, Engine>) -> ProxySettings {
-    engine.routing.read().unwrap().settings.clone()
+fn proxy_settings(engine: State<'_, Engine>) -> serde_json::Value {
+    let mut settings = engine.routing.read().unwrap().settings.clone();
+    let has_password = !settings.password.is_empty();
+    settings.password.clear();
+    let mut view = serde_json::json!(settings);
+    view["hasPassword"] = has_password.into();
+    view
 }
 
 #[tauri::command]
-fn save_proxy(settings: ProxySettings, engine: State<'_, Engine>) -> Result<(), String> {
-    let updated = Routing::new(settings)?;
+fn save_proxy(
+    mut settings: ProxySettings,
+    keep_password: Option<bool>,
+    engine: State<'_, Engine>,
+) -> Result<(), String> {
     let mut routing = engine.routing.write().unwrap();
+    let prior = &routing.settings;
+    if keep_password == Some(true)
+        && settings.password.is_empty()
+        && !settings.username.is_empty()
+        && settings.address == prior.address
+        && settings.username == prior.username
+    {
+        settings.password.clone_from(&prior.password);
+    }
+    let updated = Routing::new(settings)?;
     let folder = engine.path.parent().ok_or("配置目录不可用")?;
     std::fs::create_dir_all(folder).map_err(|_| "无法创建配置目录")?;
     let mut file = tempfile::NamedTempFile::new_in(folder).map_err(|_| "无法创建配置文件")?;

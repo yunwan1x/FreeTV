@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { countryPicker, radioCountries } from "./country-picker.js";
 import { Player } from "./player.js";
 
 const el = (id) => document.getElementById(id);
@@ -248,10 +249,14 @@ export function setupRadio(read, write, stopTV) {
       }
     }
   }
+  const picker = countryPicker(el("radioCountry"), () =>
+    el("radioFilters").requestSubmit(),
+  );
+  picker.setOptions(radioCountries);
   el("radioFilters").onsubmit = (e) => {
     e.preventDefault();
     filters = Object.fromEntries(new FormData(e.target));
-    filters.country = filters.country.trim().toUpperCase();
+    filters.country = picker.value;
     search();
   };
   el("radioFavs").onclick = () => {

@@ -1,3 +1,4 @@
+use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC};
 use reqwest::{Client, Response, Url};
 use std::time::Duration;
 
@@ -15,6 +16,8 @@ pub enum Traffic {
 pub struct ProxySettings {
     pub system: bool,
     pub address: String,
+    pub username: String,
+    pub password: String,
     pub tv_list: bool,
     pub tv_play: bool,
     pub radio_list: bool,
@@ -29,7 +32,23 @@ pub struct Routing {
 }
 
 impl Routing {
-    pub fn new(settings: ProxySettings) -> Result<Self, String> {
+    pub fn new(mut settings: ProxySettings) -> Result<Self, String> {
+        // Keep userinfo out of saved endpoints and the settings view.
+        if let Ok(mut url) = Url::parse(&settings.address) {
+            if !url.username().is_empty() || url.password().is_some() {
+                let decode = |s: &str| {
+                    percent_decode_str(s)
+                        .decode_utf8()
+                        .map(|value| value.into_owned())
+                        .map_err(|_| "代理凭据编码无效")
+                };
+                settings.username = decode(url.username())?;
+                settings.password = decode(url.password().unwrap_or(""))?;
+                url.set_password(None).map_err(|_| "代理地址无效")?;
+                url.set_username("").map_err(|_| "代理地址无效")?;
+                settings.address = url.into();
+            }
+        }
         let builder = || {
             Client::builder()
                 .user_agent(concat!("FreeTV/", env!("CARGO_PKG_VERSION")))
@@ -51,7 +70,7 @@ impl Routing {
             }
             None
         } else {
-            let url = Url::parse(&settings.address).map_err(|_| "代理地址格式无效")?;
+            let mut url = Url::parse(&settings.address).map_err(|_| "代理地址格式无效")?;
             if !matches!(url.scheme(), "http" | "https" | "socks5" | "socks5h")
                 || url.host().is_none()
                 || url.port_or_known_default().is_none()
@@ -61,8 +80,22 @@ impl Routing {
             {
                 return Err("请输入 HTTP 或 SOCKS5 代理地址和端口".into());
             }
-            if !url.username().is_empty() || url.password().is_some() {
-                return Err("当前支持无需用户名和密码的代理".into());
+            if settings.username.is_empty() != settings.password.is_empty() {
+                return Err("请同时填写代理用户名和密码，或同时留空".into());
+            }
+            if !settings.username.is_empty() {
+                if url.scheme().starts_with("socks")
+                    && (settings.username.len() > 255 || settings.password.len() > 255)
+                {
+                    return Err("SOCKS5 用户名和密码各限 255 字节".into());
+                }
+                if url.scheme().starts_with("http") && settings.username.contains(':') {
+                    return Err("HTTP 代理用户名不能包含冒号".into());
+                }
+                let user = utf8_percent_encode(&settings.username, NON_ALPHANUMERIC).to_string();
+                let pass = utf8_percent_encode(&settings.password, NON_ALPHANUMERIC).to_string();
+                url.set_username(&user).map_err(|_| "代理用户名无效")?;
+                url.set_password(Some(&pass)).map_err(|_| "代理密码无效")?;
             }
             Some(
                 builder()

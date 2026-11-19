@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { countryLabel, countryPicker } from "./country-picker.js";
 import { setupRadio } from "./radio.js";
 import { createWall } from "./video-wall.js";
 import { setupFullscreen } from "./fullscreen.js";
@@ -10,19 +11,13 @@ import apacheLicense from "../node_modules/@tauri-apps/api/LICENSE-APACHE-2.0?ra
 import "./style.css";
 
 const $ = (id) => document.getElementById(id);
-const groupNames = ["央视", "卫视", "地方", "国际"];
+const groupNames = ["央视", "卫视", "国际"];
 const repositories = [
   { name: "Free-TV/IPTV", sources: [2] },
   { name: "best-fan/iptv-sources", sources: [0, 1] },
 ];
 const feedNames = ["央视", "卫视", "全球"];
 const allSources = [0, 1, 2];
-const regionNames =
-  typeof Intl.DisplayNames === "function"
-    ? new Intl.DisplayNames(["zh-CN"], { type: "region" })
-    : null;
-const countryLabel = (code) =>
-  code === "?" ? "未标注地区" : regionNames?.of(code) || code;
 function channelCountries(channel) {
   const tagged = (channel.region || "")
     .toUpperCase()
@@ -72,6 +67,12 @@ const pendingSources = new Set();
 let syncMessage = "";
 let autoSync = read("auto-sync", true);
 let country = "";
+const tvPicker = countryPicker($("tvCountry"), (code) => {
+  country = code;
+  $("channels").scrollTo(0, 0);
+  limit = 75;
+  drawList();
+});
 let catalog = [],
   byId = new Map(),
   current,
@@ -166,6 +167,7 @@ function rebuild() {
       } else
         merged.set(c.id, {
           ...c,
+          group: c.group === "地方" ? "国际" : c.group,
           countries: channelCountries(c),
           routes: [...c.routes],
         });
@@ -178,21 +180,11 @@ function rebuild() {
     for (const code of c.countries)
       counts.set(code, (counts.get(code) || 0) + 1);
   }
-  const codes = [...counts.keys()].sort(
-    (a, b) =>
-      Number(a === "?") - Number(b === "?") ||
-      countryLabel(a).localeCompare(countryLabel(b), "zh-CN"),
-  );
-  const picker = $("tvCountry");
-  picker.replaceChildren(
-    new Option("全部国家和地区", ""),
-    ...codes.map(
-      (code) =>
-        new Option(countryLabel(code) + "（" + counts.get(code) + "）", code),
-    ),
-  );
   if (!counts.has(country)) country = "";
-  picker.value = country;
+  tvPicker.setOptions(
+    Array.from(counts, ([code, count]) => ({ code, count })),
+    country,
+  );
   for (const tile of wall.tiles) {
     if (tile.channel && byId.has(tile.channel.id))
       tile.channel = byId.get(tile.channel.id);
@@ -312,7 +304,8 @@ function select(c, start = true) {
   wall.focused.assign(c, start);
   group = c.group;
   if (country && group === "国际" && !c.countries.includes(country)) {
-    country = $("tvCountry").value = "";
+    country = "";
+    tvPicker.setValue("");
   }
   write("lastChannel", c.id);
   $("now").textContent = c.name;
@@ -548,10 +541,46 @@ async function openProxy() {
   try {
     const config = await invoke("proxy_settings");
     form.elements.mode.value = config.system ? "system" : "custom";
-    form.elements.address.value = config.address;
+    const { address, username, password } = form.elements;
+    address.value = config.address;
+    username.value = config.username;
+    const keepPassword = () =>
+      config.hasPassword &&
+      address.value.trim() === config.address &&
+      username.value === config.username;
+    function updateHint() {
+      password.placeholder = keepPassword()
+        ? "已保存，留空沿用"
+        : "无需认证时留空";
+    }
+    function unpackAddress() {
+      let url;
+      try {
+        url = new URL(address.value.trim());
+      } catch {
+        return;
+      }
+      if (!url.username && !url.password) return;
+      const user = decodeURIComponent(url.username),
+        pass = decodeURIComponent(url.password);
+      url.username = url.password = "";
+      address.value = url.href;
+      username.value = user;
+      password.value = pass;
+    }
+    address.onchange = () => {
+      try {
+        unpackAddress();
+      } catch {
+        message.textContent = "代理凭据编码无效";
+      }
+      updateHint();
+    };
+    address.oninput = username.oninput = updateHint;
+    updateHint();
     const setMode = () => {
       const system = form.elements.mode.value === "system";
-      form.elements.address.disabled = system;
+      address.disabled = username.disabled = password.disabled = system;
       form.querySelector("fieldset").disabled = system;
     };
     form.elements.mode.onchange = setMode;
@@ -562,13 +591,28 @@ async function openProxy() {
     form.onsubmit = async (event) => {
       event.preventDefault();
       submit.disabled = true;
+      try {
+        unpackAddress();
+      } catch {
+        message.textContent = "代理凭据编码无效";
+        submit.disabled = false;
+        return;
+      }
       const settings = {
+        username: username.value,
+        password: password.value,
         system: form.elements.mode.value === "system",
         address: form.elements.address.value.trim(),
       };
       for (const flag of flags) settings[flag.name] = flag.checked;
       try {
-        await invoke("save_proxy", { settings });
+        const retain = keepPassword();
+        await invoke("save_proxy", { settings, keepPassword: retain });
+        config.hasPassword = !!password.value || retain;
+        config.address = settings.address;
+        config.username = settings.username;
+        password.value = "";
+        updateHint();
         if (form.isConnected) message.textContent = "代理设置已保存";
       } catch (error) {
         message.textContent = String(error);
@@ -691,12 +735,6 @@ $("search").oninput = (e) => {
   favoritesOnly = false;
   limit = 75;
   drawTabs();
-  drawList();
-};
-$("tvCountry").onchange = (event) => {
-  country = event.target.value;
-  $("channels").scrollTo(0, 0);
-  limit = 75;
   drawList();
 };
 $("dialogBody").addEventListener("change", (event) => {

@@ -69,10 +69,21 @@
             <span id="count" class="counter"></span>
           </div>
           <div class="tabs" id="tabs"></div>
-          <label id="countryFilter" class="country-filter" hidden>
-            国家或地区
-            <select id="tvCountry"></select>
-          </label>
+          <div id="countryFilter" class="country-filter" hidden>
+            <label for="tvCountry">国家或地区</label>
+            <div class="country-combo">
+              <input
+                id="tvCountry"
+                aria-label="筛选电视频道国家或地区"
+                placeholder="全部国家和地区"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="button" aria-label="展开电视国家和地区列表">
+                ⌄
+              </button>
+            </div>
+          </div>
           <div class="chanlist" id="channels"></div>
         </aside>
       </div>
@@ -119,12 +130,16 @@
           placeholder="搜索电台名称"
           aria-label="电台名称"
         />
-        <input
-          name="country"
-          maxlength="2"
-          placeholder="国家或地区代码，如 CN"
-          aria-label="国家或地区代码"
-        />
+        <div class="country-combo">
+          <input
+            id="radioCountry"
+            placeholder="全部国家和地区"
+            aria-label="筛选电台国家或地区"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="button" aria-label="展开电台国家和地区列表">⌄</button>
+        </div>
         <input
           name="language"
           placeholder="语言，如 english"
@@ -159,9 +174,22 @@
             spellcheck="false"
             placeholder="socks5h://127.0.0.1:1080"
         /></label>
+        <label
+          >代理用户名（可选）<input
+            name="username"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+        /></label>
+        <label
+          >代理密码<input
+            name="password"
+            type="password"
+            autocomplete="new-password"
+        /></label>
         <small
           >支持 HTTP、HTTPS、SOCKS5 和 SOCKS5H。SOCKS5H
-          由代理解析域名。仅支持免认证代理。</small
+          由代理解析域名。用户名和密码以明文保存在本机配置文件中。</small
         >
         <fieldset>
           <legend>通过代理连接</legend>

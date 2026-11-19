@@ -104,7 +104,6 @@ pub fn parse(text: &str, source: usize, base: &Url) -> Catalog {
             1 => "卫视",
             _ if region == "CN" && key(matching).starts_with("cctv") => "央视",
             _ if region == "CN" && matching.contains("卫视") => "卫视",
-            _ if region == "CN" => "地方",
             _ => "国际",
         };
         let code = if region != "CN" && !field("tvg-id").is_empty() {
