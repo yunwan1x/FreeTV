@@ -29,7 +29,7 @@
     <main id="tvPage">
       <div class="between headline">
         <h1>电视直播</h1>
-        <button class="textbtn" id="manage">设置 · 频道源</button>
+        <button class="textbtn" id="manage">设置</button>
       </div>
       <div class="watch-tools">
         <div
@@ -42,11 +42,16 @@
           <button data-layout="2" aria-pressed="false">双画面</button>
           <button data-layout="4" aria-pressed="false">四宫格</button>
         </div>
-        <button class="outline" id="pip" disabled>画中画</button>
+        <div class="view-actions">
+          <button class="outline" id="pip" disabled>画中画</button>
+          <button class="outline" id="fullscreen">全屏</button>
+        </div>
       </div>
       <button class="outline" id="restorePip" hidden>返回直播大厅</button>
       <div class="stage">
-        <div id="wall" class="wall" data-layout="1"></div>
+        <div id="wall" class="wall" data-layout="1">
+          <button id="exitFullscreen" hidden>退出全屏</button>
+        </div>
         <template id="tileTemplate">
           <section class="screen">
             <video playsinline controls></video>
@@ -90,7 +95,10 @@
     <main id="radioPage" hidden>
       <section class="between headline">
         <h1>全球电台</h1>
-        <button class="outline" id="radioFavs">电台收藏</button>
+        <div class="view-actions">
+          <button class="textbtn" data-act="proxy">网络代理</button>
+          <button class="outline" id="radioFavs">电台收藏</button>
+        </div>
       </section>
       <section class="radio-tuner" aria-label="电台播放器">
         <div>
@@ -133,6 +141,46 @@
       </section>
       <footer>电台目录由 Radio Browser 提供</footer>
     </main>
+    <template id="proxyTemplate">
+      <form id="proxyForm" class="proxy-form">
+        <h2>网络代理</h2>
+        <label
+          >代理地址<input
+            name="address"
+            type="text"
+            autocomplete="off"
+            autocapitalize="none"
+            spellcheck="false"
+            placeholder="socks5h://127.0.0.1:1080"
+        /></label>
+        <small
+          >支持 HTTP、HTTPS、SOCKS5 和 SOCKS5H。SOCKS5H
+          由代理解析域名。仅支持免认证代理。</small
+        >
+        <fieldset>
+          <legend>通过代理连接</legend>
+          <label
+            ><input type="checkbox" name="tvList" />电视 · 同步频道列表</label
+          >
+          <label
+            ><input type="checkbox" name="tvPlay" />电视 ·
+            直播播放与线路检测</label
+          >
+          <label
+            ><input type="checkbox" name="radioList" />电台 ·
+            浏览与搜索目录</label
+          >
+          <label
+            ><input type="checkbox" name="radioPlay" />电台 · 收听直播</label
+          >
+        </fieldset>
+        <small
+          >未勾选的项目直连。保存后对新请求生效，正在播放的频道可重新选台。</small
+        >
+        <p class="error" role="status"></p>
+        <button class="outline" type="submit">保存设置</button>
+      </form>
+    </template>
     <dialog class="sheet" id="dialog">
       <div id="dialogBody" class="modalScroll"></div>
       <button class="outline" id="close">关闭</button>

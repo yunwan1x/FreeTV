@@ -11,7 +11,7 @@ class MediaLoader extends Hls.DefaultConfig.loader {
       context.rangeEnd > (context.rangeStart ?? 0)
         ? [context.rangeStart ?? 0, context.rangeEnd - 1]
         : null;
-    invoke("media", { url: context.url, range })
+    invoke("media", { url: context.url, range, radio: this.radio === true })
       .then((raw) => {
         if (this.ended) return;
         const data = new Uint8Array(raw);
@@ -51,8 +51,13 @@ class MediaLoader extends Hls.DefaultConfig.loader {
   }
 }
 
+class RadioLoader extends MediaLoader {
+  radio = true;
+}
+
 export class Player {
-  constructor(video, events) {
+  constructor(video, events, radio = false) {
+    this.radio = radio;
     this.video = video;
     this.events = events;
     this.generation = 0;
@@ -116,7 +121,7 @@ export class Player {
       Hls.isSupported()
     ) {
       const h = new Hls({
-        loader: MediaLoader,
+        loader: this.radio ? RadioLoader : MediaLoader,
         enableWorker: false,
         lowLatencyMode: false,
         maxBufferLength: 25,
@@ -129,8 +134,17 @@ export class Player {
       h.attachMedia(this.video);
       h.loadSource(url);
     } else {
-      this.video.src = url;
-      start();
+      invoke("playback_url", {
+        url,
+        radio: this.radio,
+        playlist: format === "hls",
+      })
+        .then((local) => {
+          if (!current()) return;
+          this.video.src = local;
+          start();
+        })
+        .catch(fail);
     }
   }
 }

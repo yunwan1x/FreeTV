@@ -47,12 +47,16 @@ export function setupRadio(read, write, stopTV) {
       mode = null;
       throw error;
     }));
-  const desktop = new Player(audio, {
-    trying: () => setState("buffering"),
-    playing: () => setState("playing"),
-    exhausted: () => setState("error"),
-    tap: () => setState("paused"),
-  });
+  const desktop = new Player(
+    audio,
+    {
+      trying: () => setState("buffering"),
+      playing: () => setState("playing"),
+      exhausted: () => setState("error"),
+      tap: () => setState("paused"),
+    },
+    true,
+  );
   function setState(value, error = "") {
     state = value;
     lastError = error;
@@ -111,13 +115,19 @@ export function setupRadio(read, write, stopTV) {
       if (version !== playVersion) return;
       const hls = !!station.hls || /\.m3u8([?#]|$)/i.test(urls[0]);
       if (native) {
+        const local = await Promise.all(
+          urls.map((url) =>
+            invoke("playback_url", { url, radio: true, playlist: hls }),
+          ),
+        );
+        if (version !== playVersion) return;
         await enqueue(() =>
           nativeCommand("start", {
             id: station.stationuuid,
             name: station.name,
             region: station.countrycode,
-            url: urls[0],
-            fallback: urls[1] || "",
+            url: local[0],
+            fallback: local[1] || "",
             hls,
           }),
         );

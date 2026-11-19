@@ -9,6 +9,10 @@ import android.webkit.WebView
 import android.content.ComponentName
 import android.net.Uri
 import android.os.Bundle
+import androidx.activity.OnBackPressedCallback
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
@@ -30,8 +34,33 @@ class RadioPlugin(private val activity: Activity) : Plugin(activity) {
 
     private var view: WebView? = null
 
+    private val fullscreenBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            setFullscreen(false)
+            view?.evaluateJavascript("window.dispatchEvent(new Event('freetv-fullscreen-exit'))", null)
+        }
+    }
+
+    private fun setFullscreen(enabled: Boolean) {
+        val controller = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+        if (enabled) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else controller.show(WindowInsetsCompat.Type.systemBars())
+        fullscreenBack.isEnabled = enabled
+    }
+
+    @Command
+    fun fullscreen(invoke: Invoke) {
+        activity.runOnUiThread {
+            setFullscreen(invoke.getArgs().getBoolean("enabled"))
+            invoke.resolve()
+        }
+    }
+
     override fun load(webView: WebView) {
         view = webView
+        (activity as AppCompatActivity).onBackPressedDispatcher.addCallback(activity, fullscreenBack)
         (activity as AppCompatActivity).addOnPictureInPictureModeChangedListener { info ->
             val event = if (info.isInPictureInPictureMode) "freetv-pip-enter" else "freetv-pip-exit"
             if (info.isInPictureInPictureMode) webView.onResume()

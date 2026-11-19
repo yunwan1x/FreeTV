@@ -85,7 +85,11 @@ mod desktop {
         let mut cmd = Command::new(path);
         #[cfg(windows)]
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-        cmd.kill_on_drop(true)
+        cmd.env_remove("http_proxy")
+            .env_remove("HTTP_PROXY")
+            .env_remove("all_proxy")
+            .env_remove("ALL_PROXY")
+            .kill_on_drop(true)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -136,6 +140,11 @@ pub async fn choose_ffmpeg() -> Result<Option<String>, String> {
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn decode_route(url: String, path: Option<String>) -> Result<(), String> {
-    desktop::decode(url, path).await
+pub async fn decode_route(
+    url: String,
+    path: Option<String>,
+    engine: tauri::State<'_, crate::Engine>,
+) -> Result<(), String> {
+    let local = engine.playback_url(&url, false, false).await?;
+    desktop::decode(local, path).await
 }

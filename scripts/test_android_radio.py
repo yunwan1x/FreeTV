@@ -82,7 +82,11 @@ def test(folder):
                 return result["result"].get("value")
     station = {"stationuuid":"screen-off-test","name":"Screen-off test","countrycode":"GB",
                "url":"http://127.0.0.1:8791/radio.wav","url_resolved":"","hls":0,"codec":"PCM","language":""}
-    wait(lambda: evaluate("!!document.querySelector('#radioNav')?.onclick"))
+    try:
+        wait(lambda: evaluate("!!document.querySelector('#radioNav')?.onclick"))
+    except AssertionError:
+        print("WebView:", evaluate("[location.href,document.readyState,document.body?.innerText?.slice(0,320)]"), file=sys.stderr)
+        raise
     clip = Path(folder) / "test.m3u8"
     subprocess.run([shutil.which("ffmpeg") or "ffmpeg", "-loglevel", "error",
                     "-f", "lavfi", "-i", "testsrc2=size=256x144:rate=10", "-t", "90",
@@ -119,6 +123,11 @@ def test(folder):
     adb("shell", "wm", "dismiss-keyguard")
     evaluate("document.querySelector('#home').click();document.querySelector('.screen-play').click()")
     wait(lambda: evaluate("document.querySelector('.screen video').currentTime > 1"))
+    evaluate("document.querySelector('#fullscreen').click()")
+    wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    wait(lambda: evaluate("!document.body.classList.contains('cinema-mode')"))
+    print("Verified Android fullscreen and system Back.")
     evaluate("document.querySelector('#pip').click()")
     def pinned():
         return re.search(r"mode=pinned[^\n]*", adb("shell", "dumpsys", "activity", "activities")) is not None

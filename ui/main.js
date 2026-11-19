@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setupRadio } from "./radio.js";
 import { createWall } from "./video-wall.js";
+import { setupFullscreen } from "./fullscreen.js";
 import { setupPip } from "./video-pip.js";
 import { previewFirstFrame } from "./player.js";
 import checkerNotice from "../licenses/iptv-checker-rs.txt?raw";
@@ -106,7 +107,8 @@ const wall = createWall({
     preferred[channel.id] = url;
     write("preferred", preferred);
   },
-  onChoose() {
+  async onChoose() {
+    await exitFullscreen();
     $("listTitle").scrollIntoView({ block: "nearest" });
     $("channels").querySelector("button")?.focus({ preventScroll: true });
   },
@@ -231,7 +233,7 @@ async function refresh(sources = allSources) {
     : "已同步 " + sources.length + " 份频道列表。";
   rebuild();
   if (!catalog.length) {
-    status("请检查网络，打开「设置 · 频道源」重试。");
+    status("请检查网络，打开「设置」重试。");
   }
   renderSources();
 }
@@ -522,7 +524,9 @@ function renderSources() {
     .join("");
   dialog(
     "sources",
-    "<h2>频道源设置</h2>" +
+    "<div class='between'><h2>频道源设置</h2>" +
+      action("proxy", "网络代理", "outline") +
+      "</div>" +
       '<label class="auto-sync"><input id="autoSync" type="checkbox"' +
       (autoSync ? " checked" : "") +
       ">启动时自动同步超过 6 小时的列表</label>" +
@@ -534,6 +538,36 @@ function renderSources() {
       "<h3>线路检测</h3>" +
       scanControl(),
   );
+}
+async function openProxy() {
+  dialog("proxy", $("proxyTemplate").innerHTML);
+  const form = $("proxyForm");
+  const message = form.querySelector("[role=status]");
+  const submit = form.querySelector("[type=submit]");
+  submit.disabled = true;
+  try {
+    const config = await invoke("proxy_settings");
+    form.elements.address.value = config.address;
+    const flags = [...form.querySelectorAll("[type=checkbox]")];
+    for (const flag of flags) flag.checked = config[flag.name];
+    submit.disabled = false;
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      submit.disabled = true;
+      const settings = { address: form.elements.address.value.trim() };
+      for (const flag of flags) settings[flag.name] = flag.checked;
+      try {
+        await invoke("save_proxy", { settings });
+        if (form.isConnected) message.textContent = "代理设置已保存";
+      } catch (error) {
+        message.textContent = String(error);
+      } finally {
+        submit.disabled = false;
+      }
+    };
+  } catch (error) {
+    message.textContent = String(error);
+  }
 }
 async function measure(url) {
   if (inFlight.has(url)) return inFlight.get(url);
@@ -673,6 +707,7 @@ $("layouts").onclick = (event) => {
   if (button) wall.layout(Number(button.dataset.layout));
 };
 setupPip(wall, status);
+const exitFullscreen = setupFullscreen(status);
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
   if (!b) return;
@@ -723,6 +758,9 @@ document.addEventListener("click", (e) => {
       write("health", [...health]);
       renderSources();
       renderRouteModal();
+      break;
+    case "proxy":
+      openProxy();
       break;
     case "syncRepo":
       refresh(repositories[Number(i)].sources);
