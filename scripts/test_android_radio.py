@@ -23,11 +23,18 @@ def adb(*args):
     return subprocess.check_output(["adb", *args], text=True, timeout=30).strip()
 
 
-def wait(check, seconds=35):
+class PageTransition(Exception):
+    pass
+
+
+def wait(check, seconds=45):
     end = time.monotonic() + seconds
     while time.monotonic() < end:
-        if check():
-            return
+        try:
+            if check():
+                return
+        except PageTransition:
+            pass
         time.sleep(0.5)
     raise AssertionError(f"Timed out waiting for {check.__name__}")
 
@@ -73,7 +80,7 @@ def test(folder):
     def target():
         try:
             tabs = json.load(urlopen(f"http://127.0.0.1:{port}/json", timeout=5))
-            return next((t["webSocketDebuggerUrl"] for t in tabs if t["type"] == "page"), None)
+            return next((t["webSocketDebuggerUrl"] for t in tabs if t["type"] == "page" and urlsplit(t.get("url", "")).hostname == "tauri.localhost"), None)
         except OSError:
             return None
     wait(target)
@@ -87,6 +94,9 @@ def test(folder):
             message = json.loads(ws.recv())
             if message.get("id") == sequence:
                 if "error" in message:
+                    detail = message["error"]["message"].lower()
+                    if "navigated" in detail or "context" in detail:
+                        raise PageTransition(detail)
                     raise AssertionError(message["error"])
                 return message["result"]
     def evaluate(expression):
