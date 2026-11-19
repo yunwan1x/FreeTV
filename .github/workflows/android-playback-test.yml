@@ -1,0 +1,42 @@
+name: Android playback checks
+on:
+  workflow_call:
+    inputs:
+      run_id:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Build run containing radio-emulator-apk
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: read
+jobs:
+  playback:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: radio-emulator-apk
+          path: emulator-apk
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.run_id }}
+      - name: Prepare emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          python -m pip install --target "$RUNNER_TEMP/radio-test-python" websocket-client
+      - name: Verify screen-off radio, system controls and TV picture in picture
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          disk-size: 2048M
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: PYTHONPATH="$RUNNER_TEMP/radio-test-python" python scripts/test_android_radio.py

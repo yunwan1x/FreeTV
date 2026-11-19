@@ -87,13 +87,9 @@ def test(folder):
     except AssertionError:
         print("WebView:", evaluate("[location.href,document.readyState,document.body?.innerText?.slice(0,320)]"), file=sys.stderr)
         raise
-    clip = Path(folder) / "test.m3u8"
-    subprocess.run([shutil.which("ffmpeg") or "ffmpeg", "-loglevel", "error",
-                    "-f", "lavfi", "-i", "testsrc2=size=256x144:rate=10", "-t", "90",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-g", "20",
-                    "-hls_time", "2", "-hls_list_size", "0", str(clip)], check=True)
+    shutil.copyfile(Path(__file__).with_name("test-pattern.mp4"), Path(folder) / "test.mp4")
     channel = {"id": "pip-test", "name": "PiP test", "group": "央视", "region": "CN",
-               "logo": "", "epg_id": "", "routes": ["http://127.0.0.1:8791/test.m3u8"]}
+               "logo": "", "epg_id": "", "routes": ["http://127.0.0.1:8791/test.mp4"]}
     seed = {"radio-favorites": [[station["stationuuid"], station]],
             **{f"feed-{i}": {"channels": [channel] if i == 0 else [],
                              "updated": int(time.time() * 1000)} for i in range(3)}}
