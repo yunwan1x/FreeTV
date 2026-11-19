@@ -1,4 +1,6 @@
-//! Apple CMS catalogs, LibreTV source lists and MediathekView public broadcaster search.
+//! On-demand catalogs, playable media and source subscriptions.
+mod archive;
+mod peertube;
 use crate::network::{bytes, web_url};
 use reqwest::{Client, RequestBuilder, Url};
 use serde::Serialize;
@@ -126,6 +128,12 @@ fn cms_url(api: &str) -> Result<Url, String> {
 }
 pub async fn catalog(client: &Client, api: &str, query: &str, page: u32) -> Result<Page, String> {
     let page = page.clamp(1, 10000);
+    if api == archive::API {
+        return archive::catalog(client, query, page).await;
+    }
+    if api == peertube::API {
+        return peertube::catalog(client, query, page).await;
+    }
     if api == MEDIATHEK {
         let search = if query.trim().is_empty() {
             json!([])
@@ -200,6 +208,12 @@ pub async fn catalog(client: &Client, api: &str, query: &str, page: u32) -> Resu
     })
 }
 pub async fn detail(client: &Client, api: &str, id: &str) -> Result<Film, String> {
+    if api == archive::API {
+        return archive::detail(client, id).await;
+    }
+    if api == peertube::API {
+        return peertube::detail(client, id).await;
+    }
     let mut url = cms_url(api)?;
     url.query_pairs_mut().append_pair("ids", id);
     let data = json_response(client.get(url)).await?;

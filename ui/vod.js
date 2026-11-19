@@ -96,6 +96,28 @@ function posterLoader() {
     },
   };
 }
+// Normalize provider genres for the browse shelves. Keep uncategorized videos accessible.
+const shelves = [
+  ["纪录与档案", /纪录|档案|馆藏|documentary/i],
+  ["动漫与动画", /动漫|动画|animation|cartoon/i],
+  ["综艺与音乐", /综艺|音乐|晚会|演唱会|music|entertainment/i],
+  ["剧集", /剧集|连续剧|短剧|国产剧|港台剧|欧美剧|日韩剧|香港剧|韩国剧|日本剧|台湾剧|美国剧|泰国剧|海外剧|大陆剧|电视剧/],
+  ["电影", /电影|片$|films?/i],
+  ["知识与科技", /科教|科技|教育|讲座|公开课|science|technology|education|how to|tutorial/i],
+  ["生活与文化", /文化|生活|旅行|美食|art|travel|food|animals|craft/i],
+  ["新闻与体育", /新闻|时政|体育|news|politics|sports/i],
+  ["游戏", /游戏|gaming|video games/i],
+];
+function shelfName(film, provider) {
+  const genre = film.category || "";
+  const match = shelves.find(([, pattern]) => pattern.test(genre));
+  if (match) return match[0];
+  if (provider?.api === mediathek) return "公共电视";
+  return genre && !/^(unknown|misc|other|其他|其它)$/i.test(genre)
+    ? genre
+    : "其他视频";
+}
+
 export function setupVod(read, write) {
   let visible = false,
     view = "browse",
@@ -103,6 +125,7 @@ export function setupVod(read, write) {
     filter = "",
     query = "",
     savedOnly = false;
+  const expandedShelves = new Set();
   let catalogEpoch = 0,
     detailEpoch = 0,
     busy = false,
@@ -250,7 +273,7 @@ export function setupVod(read, write) {
       ? "我的片单"
       : query
         ? "搜索结果"
-        : "最近更新";
+        : "分类浏览";
     $("vodBookmarks").setAttribute("aria-pressed", String(savedOnly));
     const resume = $("vodResume");
     resume.hidden =
@@ -279,37 +302,75 @@ export function setupVod(read, write) {
         for (const page of pages) if (page[i]) films.push(page[i]);
     }
     const byId = new Map(films.map((f) => [identity(f), f]));
-    const known = settings.sources();
-    $("vodCards").replaceChildren(
-      ...[...byId.values()].map((f) => {
-        const provider = known.find((s) => s.id === f.source);
-        const card = element("button", null, "vod-card");
-        const cover = element("div", null, "vod-cover");
-        cover.append(
-          element("span", f.title.slice(0, 10), "vod-cover-fallback"),
-        );
-        if (f.poster) {
-          const img = element("img");
-          img.alt = "";
-          img.dataset.src = f.poster;
-          cover.append(img);
-          covers.observe(img);
+    const known = new Map(settings.sources().map((s) => [s.id, s]));
+    function cardFor(f) {
+      const provider = known.get(f.source);
+      const card = element("button", null, "vod-card");
+      const cover = element("div", null, "vod-cover");
+      cover.append(
+        element("span", f.title.slice(0, 10), "vod-cover-fallback"),
+      );
+      if (f.poster) {
+        const img = element("img");
+        img.alt = "";
+        img.dataset.src = f.poster;
+        cover.append(img);
+        covers.observe(img);
+      }
+      if (f.note) cover.append(element("small", f.note, "vod-badge"));
+      card.append(
+        cover,
+        element("b", f.title),
+        element(
+          "small",
+          [provider?.name || "已移除的来源", f.year || f.category]
+            .filter(Boolean)
+            .join(" · "),
+        ),
+      );
+      card.onclick = () => watch(f);
+      return card;
+    }
+    const grouped = !query && !savedOnly;
+    const cards = $("vodCards");
+    cards.classList.toggle("vod-shelves", grouped);
+    if (grouped) {
+      const groups = new Map(shelves.map(([name]) => [name, []]));
+      for (const f of byId.values()) {
+        const name = shelfName(f, known.get(f.source));
+        if (!groups.has(name)) groups.set(name, []);
+        groups.get(name).push(f);
+      }
+      const sections = [];
+      for (const [name, items] of groups) {
+        if (!items.length) continue;
+        const section = element("section");
+        const heading = element("div", null, "between vod-shelf-heading");
+        heading.append(element("h3", name));
+        const expanded = expandedShelves.has(name);
+        if (items.length > 6) {
+          const toggle = element(
+            "button",
+            expanded ? "收起" : "展开 " + items.length + " 部",
+            "outline",
+          );
+          toggle.setAttribute("aria-expanded", String(expanded));
+          toggle.onclick = () => {
+            if (expanded) expandedShelves.delete(name);
+            else expandedShelves.add(name);
+            drawCards();
+          };
+          heading.append(toggle);
         }
-        if (f.note) cover.append(element("small", f.note, "vod-badge"));
-        card.append(
-          cover,
-          element("b", f.title),
-          element(
-            "small",
-            [provider?.name || "已移除的来源", f.year || f.category]
-              .filter(Boolean)
-              .join(" · "),
-          ),
-        );
-        card.onclick = () => watch(f);
-        return card;
-      }),
-    );
+        const grid = element("div", null, "vod-cards");
+        grid.append(...(expanded ? items : items.slice(0, 6)).map(cardFor));
+        section.append(heading, grid);
+        sections.push(section);
+      }
+      cards.replaceChildren(...sections);
+    } else {
+      cards.replaceChildren(...Array.from(byId.values(), cardFor));
+    }
     const failures = [...results.values()]
       .filter((p) => p.error)
       .map((p) => p.name + "：" + p.error);
@@ -337,14 +398,19 @@ export function setupVod(read, write) {
   async function load(more = false) {
     const stamp = ++catalogEpoch;
     catalogKey = key();
-    if (!more) results = new Map();
+    if (!more) {
+      results = new Map();
+      expandedShelves.clear();
+    }
     drawFilters();
     if (savedOnly) {
       busy = false;
       drawCards();
       return;
     }
-    const sources = enabled().filter((s) => !filter || s.id === filter);
+    const sources = enabled()
+      .filter((s) => !filter || s.id === filter)
+      .sort((a, b) => Number(b.group === "international") - Number(a.group === "international"));
     busy = true;
     for (const s of sources)
       if (!results.has(s.id))
@@ -495,8 +561,8 @@ export function setupVod(read, write) {
           ...enabled().filter(
             (s) =>
               s.id !== source.id &&
-              s.api !== mediathek &&
-              source.api !== mediathek,
+              s.group !== "international" &&
+              source.group !== "international",
           ),
         ]
       : [];

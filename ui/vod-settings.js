@@ -24,12 +24,21 @@ const builtin = [
   },
 ];
 export const mediathek = "https://mediathekviewweb.de/api/query";
-const international = {
-  key: "mediathek",
-  name: "MediathekView",
-  api: mediathek,
-  enabled: false,
-};
+const international = [
+  {
+    key: "peertube",
+    name: "PeerTube / Sepia Search",
+    api: "https://sepiasearch.org/api/v1/search/videos",
+    enabled: true,
+  },
+  {
+    key: "archive",
+    name: "Internet Archive",
+    api: "https://archive.org/advancedsearch.php",
+    enabled: true,
+  },
+  { key: "mediathek", name: "MediathekView", api: mediathek, enabled: false },
+];
 const $ = (id) => document.getElementById(id);
 export function setupVodSettings(read, write, changed) {
   const prefs = read("vod-settings-v1", {
@@ -52,7 +61,7 @@ export function setupVodSettings(read, write, changed) {
     );
     const seedKeys = new Set(builtin.map((s) => s.key));
     const discovered = (synced?.sources || []).filter(
-      (s) => !seedKeys.has(s.key) && !customApis.has(s.api) && s.api !== mediathek,
+      (s) => !seedKeys.has(s.key) && !customApis.has(s.api) && !international.some((v) => v.api === s.api),
     );
     return [
       {
@@ -70,8 +79,8 @@ export function setupVodSettings(read, write, changed) {
       },
       {
         address: "international",
-        name: "国际公共媒体",
-        sources: [international],
+        name: "国际点播源",
+        sources: international,
       },
       ...custom,
     ];
@@ -190,7 +199,7 @@ export function setupVodSettings(read, write, changed) {
           (g.updated
             ? "最近同步 " + new Date(g.updated).toLocaleString("zh-CN")
             : g.address === "international"
-              ? "德国及欧洲公共广播机构节目"
+              ? "跨站视频搜索、数字馆藏和欧洲公共广播节目"
               : "尚未同步");
         card.append(head, note);
         for (const s of entries) {

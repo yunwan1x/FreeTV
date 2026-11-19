@@ -102,6 +102,17 @@
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
   gap: 17px 14px;
 }
+.vod-cards.vod-shelves {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.vod-shelf-heading {
+  margin: 0 0 10px;
+}
+.vod-shelf-heading h3 {
+  margin: 0;
+}
 .vod-card {
   display: flex;
   flex-direction: column;
