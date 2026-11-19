@@ -38,7 +38,7 @@ def session_state():
     dump = adb("shell", "dumpsys", "media_session")
     for section in re.split(r"(?=\bpackage=)", dump):
         if section.startswith("package=" + PACKAGE):
-            state = re.search(r"state=PlaybackState\s*\{state=(\d+)", section)
+            state = re.search(r"state=PlaybackState\s*\{state=(?:\w+\()?([0-9]+)", section)
             if state:
                 return int(state[1])
     return None
@@ -51,7 +51,7 @@ def test(folder):
         media.writeframes(bytes(2 * 8000 * 180))
     server = ThreadingHTTPServer(("127.0.0.1", 8791), partial(SimpleHTTPRequestHandler, directory=folder))
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    apk, = Path("src-tauri/gen/android/app/build/outputs/apk").rglob("*debug.apk")
+    apk, = Path("emulator-apk").rglob("*debug.apk")
     adb("install", "-r", str(apk))
     adb("reverse", "tcp:8791", "tcp:8791")
     adb("shell", "am", "start", "-n", PACKAGE + "/.MainActivity")
