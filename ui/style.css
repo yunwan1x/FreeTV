@@ -1026,3 +1026,35 @@ footer button {
     gap: 14px;
   }
 }
+
+.country-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #dadbda;
+}
+.country-filter select {
+  min-width: 0;
+  flex: 1;
+  font: inherit;
+  color-scheme: dark;
+  background: #303232;
+  color: white;
+  border: 1px solid #565855;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+.auto-sync,
+.source-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.auto-sync {
+  margin: 4px 0 12px;
+}
+.source-feed {
+  margin-top: 8px;
+}

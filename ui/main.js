@@ -8,7 +8,29 @@ import "./style.css";
 
 const $ = (id) => document.getElementById(id);
 const groupNames = ["央视", "卫视", "地方", "国际"];
-const feedNames = ["best-fan · 央视", "best-fan · 卫视", "Free-TV · 全球"];
+const repositories = [
+  { name: "Free-TV/IPTV", sources: [2] },
+  { name: "best-fan/iptv-sources", sources: [0, 1] },
+];
+const feedNames = ["央视", "卫视", "全球"];
+const allSources = [0, 1, 2];
+const regionNames =
+  typeof Intl.DisplayNames === "function"
+    ? new Intl.DisplayNames(["zh-CN"], { type: "region" })
+    : null;
+const countryLabel = (code) =>
+  code === "?" ? "未标注地区" : regionNames?.of(code) || code;
+function channelCountries(channel) {
+  const tagged = (channel.region || "")
+    .toUpperCase()
+    .split(/[^A-Z]+/)
+    .filter((code) => /^[A-Z]{2}$/.test(code));
+  const suffix = channel.epg_id
+    ?.match(/\.([a-z]{2})(?:@[^.]*)?$/i)?.[1]
+    .toUpperCase();
+  const codes = tagged.length ? tagged : [suffix || "?"];
+  return [...new Set(codes.map((code) => (code === "UK" ? "GB" : code)))];
+}
 const read = (key, fallback) => {
   try {
     return JSON.parse(localStorage.getItem(key)) ?? fallback;
@@ -42,8 +64,11 @@ const action = (name, text, cls = "", i = "") =>
   text +
   "</button>";
 let feeds = feedNames.map((_, i) => read("feed-" + i, null));
-let feedErrors = [],
-  refreshing = false;
+const feedErrors = [];
+const pendingSources = new Set();
+let syncMessage = "";
+let autoSync = read("auto-sync", true);
+let country = "";
 let catalog = [],
   byId = new Map(),
   current,
@@ -148,11 +173,36 @@ function rebuild() {
       if (old) {
         old.routes = [...new Set([...old.routes, ...c.routes])];
         old.epg_id ||= c.epg_id;
-      } else merged.set(c.id, { ...c, routes: [...c.routes] });
+      } else
+        merged.set(c.id, {
+          ...c,
+          countries: channelCountries(c),
+          routes: [...c.routes],
+        });
     }
   }
   byId = merged;
   catalog = [...merged.values()];
+  const counts = new Map();
+  for (const c of catalog.filter((c) => c.group === "国际")) {
+    for (const code of c.countries)
+      counts.set(code, (counts.get(code) || 0) + 1);
+  }
+  const codes = [...counts.keys()].sort(
+    (a, b) =>
+      Number(a === "?") - Number(b === "?") ||
+      countryLabel(a).localeCompare(countryLabel(b), "zh-CN"),
+  );
+  const picker = $("tvCountry");
+  picker.replaceChildren(
+    new Option("全部国家和地区", ""),
+    ...codes.map(
+      (code) =>
+        new Option(countryLabel(code) + "（" + counts.get(code) + "）", code),
+    ),
+  );
+  if (!counts.has(country)) country = "";
+  picker.value = country;
   if (current && byId.has(current.id)) current = byId.get(current.id);
   else {
     const selected = byId.get(read("lastChannel", "")) ?? catalog[0];
@@ -162,41 +212,42 @@ function rebuild() {
   drawQuick();
   drawTabs();
 }
-async function refresh(fullCheck = false) {
-  if (refreshing) return;
-  refreshing = true;
-  feedErrors = [];
-  renderSources();
-  try {
-    await Promise.all(
-      feedNames.map(async (_, source) => {
-        try {
-          const result = await invoke("subscription", { source });
-          feeds[source] = { channels: result.channels, updated: Date.now() };
-          write("feed-" + source, feeds[source]);
-        } catch (e) {
-          feedErrors[source] = String(e);
-        }
-      }),
-    );
-    rebuild();
-    if (!current) {
-      $("title").textContent = "暂时无法载入频道";
-      status("请检查网络，打开「频道订阅」重试。");
-    }
-  } finally {
-    refreshing = false;
-    renderSources();
+async function refresh(sources = allSources) {
+  if (pendingSources.size) return;
+  syncMessage = "";
+  for (const i of sources) {
+    pendingSources.add(i);
+    delete feedErrors[i];
   }
-  if (fullCheck && catalog.length)
-    scan(
-      catalog.flatMap((c) => c.routes),
-      "全部订阅",
-    );
+  renderSources();
+  await Promise.all(
+    sources.map(async (source) => {
+      try {
+        const result = await invoke("subscription", { source });
+        feeds[source] = { channels: result.channels, updated: Date.now() };
+        write("feed-" + source, feeds[source]);
+      } catch (e) {
+        feedErrors[source] = String(e);
+      } finally {
+        pendingSources.delete(source);
+        renderSources();
+      }
+    }),
+  );
+  const failed = sources.filter((i) => feedErrors[i]).length;
+  syncMessage = failed
+    ? "同步结束，" + failed + " 份列表失败。"
+    : "已同步 " + sources.length + " 份频道列表。";
+  rebuild();
+  if (!current) {
+    $("title").textContent = "暂时无法载入频道";
+    status("请检查网络，打开「设置 · 频道源」重试。");
+  }
+  renderSources();
 }
 function drawTabs() {
   $("tabs").innerHTML =
-    favoritesOnly || query
+    favoritesOnly || (query && group !== "国际")
       ? ""
       : groupNames
           .map((g) => action("group", g, group === g ? "active" : "", g))
@@ -206,11 +257,18 @@ function short(c) {
   return c.name.match(/^CCTV[- ]?\d+\+?/i)?.[0] || c.region || "TV";
 }
 function drawList() {
+  const international = !favoritesOnly && group === "国际";
+  $("countryFilter").hidden = !international;
   const items = catalog.filter(
     (c) =>
       (!favoritesOnly || favorites.has(c.id)) &&
+      (!international ||
+        (c.group === "国际" && (!country || c.countries.includes(country)))) &&
       (query
-        ? (c.name + " " + c.region + " " + c.id).toLowerCase().includes(query)
+        ? [c.name, c.region, c.id, ...c.countries.map(countryLabel)]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
         : favoritesOnly || group === c.group),
   );
   $("count").textContent = items.length + " 个频道";
@@ -235,7 +293,7 @@ function drawList() {
             "</span><span><b>" +
             escape(c.name) +
             "</b><small>" +
-            escape(c.region) +
+            escape(c.countries.map(countryLabel).join("、")) +
             " · " +
             c.routes.length +
             " 条线路</small></span>",
@@ -247,7 +305,7 @@ function drawList() {
     '<p class="empty">' +
       (favoritesOnly
         ? "暂无收藏频道"
-        : refreshing
+        : pendingSources.size
           ? "正在更新频道…"
           : "暂无匹配频道") +
       "</p>";
@@ -281,10 +339,14 @@ function select(c, start = true) {
   current = c;
   activeUrl = "";
   group = c.group;
+  if (country && group === "国际" && !c.countries.includes(country)) {
+    country = $("tvCountry").value = "";
+  }
   write("lastChannel", c.id);
   $("cover").hidden = false;
   $("title").textContent = $("now").textContent = c.name;
-  $("station").textContent = c.group + " · " + (c.region || "TV");
+  $("station").textContent =
+    c.group + " · " + c.countries.map(countryLabel).join("、");
   $("play").disabled = $("save").disabled = $("routes").disabled = false;
   $("play").textContent = "▶ 播放直播";
   $("guideName").textContent = c.name;
@@ -491,33 +553,69 @@ function scanControl() {
 }
 function renderSources() {
   if (dialogType !== "sources") return;
-  const rows = feedNames
-    .map(
-      (name, i) =>
-        '<div class="detail"><b>' +
+  const syncButton = (repo) => {
+    const busy = pendingSources.size ? " disabled" : "";
+    return repo === undefined
+      ? '<button class="outline" data-act="refresh"' +
+          busy +
+          ">同步全部上游</button>"
+      : '<button class="outline" data-act="syncRepo" data-i="' +
+          repo +
+          '"' +
+          busy +
+          ">同步此仓库</button>";
+  };
+  const rows = repositories
+    .map(({ name, sources }, repo) => {
+      const details = sources
+        .map((i) => {
+          const feed = feeds[i];
+          const saved = feed
+            ? feed.channels.length +
+              " 个频道 · 上次成功 " +
+              new Date(feed.updated).toLocaleString("zh-CN")
+            : "尚未载入";
+          const error = feedErrors[i]
+            ? '<small class="error">同步失败' +
+              (feed ? "，已沿用上次列表" : "") +
+              " · " +
+              escape(feedErrors[i]) +
+              "</small>"
+            : "";
+          return (
+            '<div class="source-feed"><b>' +
+            feedNames[i] +
+            "</b><small>" +
+            (pendingSources.has(i) ? "同步中…" : saved) +
+            "</small>" +
+            error +
+            "</div>"
+          );
+        })
+        .join("");
+      return (
+        '<section class="detail"><div class="between source-heading"><strong>' +
         name +
-        "</b><small>" +
-        (feeds[i]
-          ? feeds[i].channels.length +
-            " 个频道 · " +
-            new Date(feeds[i].updated).toLocaleString("zh-CN")
-          : "尚未载入") +
-        "</small>" +
-        (feedErrors[i]
-          ? '<small class="error">更新失败 · ' +
-            escape(feedErrors[i]) +
-            "</small>"
-          : "") +
-        "</div>",
-    )
+        "</strong>" +
+        syncButton(repo) +
+        "</div>" +
+        details +
+        "</section>"
+      );
+    })
     .join("");
   dialog(
     "sources",
-    "<h2>频道订阅</h2>" +
+    "<h2>频道源设置</h2>" +
+      '<label class="auto-sync"><input id="autoSync" type="checkbox"' +
+      (autoSync ? " checked" : "") +
+      ">启动时自动同步超过 6 小时的列表</label>" +
       rows +
-      (refreshing
-        ? "<p>正在更新…</p>"
-        : action("refresh", "更新订阅并检测", "outline")) +
+      syncButton() +
+      '<p role="status">' +
+      (pendingSources.size ? "正在同步…" : syncMessage) +
+      "</p>" +
+      "<h3>线路检测</h3>" +
       scanControl(),
   );
 }
@@ -638,6 +736,18 @@ $("search").oninput = (e) => {
   drawTabs();
   drawList();
 };
+$("tvCountry").onchange = (event) => {
+  country = event.target.value;
+  $("channels").scrollTo(0, 0);
+  limit = 75;
+  drawList();
+};
+$("dialogBody").addEventListener("change", (event) => {
+  if (event.target.id === "autoSync") {
+    autoSync = event.target.checked;
+    write("auto-sync", autoSync);
+  }
+});
 $("play").onclick = () => play();
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-act]");
@@ -649,6 +759,7 @@ document.addEventListener("click", (e) => {
       break;
     case "group":
       group = i;
+      query = $("search").value = "";
       limit = 75;
       drawTabs();
       drawList();
@@ -689,8 +800,11 @@ document.addEventListener("click", (e) => {
       renderSources();
       renderRouteModal();
       break;
+    case "syncRepo":
+      refresh(repositories[Number(i)].sources);
+      break;
     case "refresh":
-      refresh(true);
+      refresh();
       break;
     case "show": {
       const s = visibleShows[Number(i)];
@@ -717,9 +831,13 @@ drawGuide();
 setInterval(drawGuide, 60000);
 if (!isTauri()) {
   status("请从 FreeTV 客户端打开，或使用 npm run tauri dev 启动。");
-} else if (
-  feeds.some((feed) => !feed || Date.now() - feed.updated > 6 * 3600 * 1000)
-)
-  refresh();
+} else {
+  const stale = allSources.filter(
+    (i) =>
+      !feeds[i] ||
+      (autoSync && Date.now() - feeds[i].updated > 6 * 3600 * 1000),
+  );
+  if (stale.length) refresh(stale);
+}
 
 if (read("radio-visible", false)) showPage(true);

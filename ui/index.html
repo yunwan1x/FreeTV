@@ -30,7 +30,7 @@
     <main id="tvPage">
       <div class="between headline">
         <h1>电视直播</h1>
-        <button class="textbtn" id="manage">频道订阅</button>
+        <button class="textbtn" id="manage">设置 · 频道源</button>
       </div>
       <div class="stage">
         <section class="player">
@@ -47,6 +47,10 @@
             <span id="count" class="counter"></span>
           </div>
           <div class="tabs" id="tabs"></div>
+          <label id="countryFilter" class="country-filter" hidden>
+            国家或地区
+            <select id="tvCountry"></select>
+          </label>
           <div class="chanlist" id="channels"></div>
         </aside>
       </div>
