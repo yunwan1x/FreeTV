@@ -12,6 +12,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.request import urlopen
+from urllib.parse import urlsplit
 
 import websocket
 
@@ -45,12 +46,22 @@ def session_state():
     return None
 
 
+class FixtureProxy(SimpleHTTPRequestHandler):
+    def do_GET(self):
+        target = urlsplit(self.path)
+        if target.hostname != "fixture.invalid":
+            self.send_error(403)
+            return
+        self.path = target.path
+        super().do_GET()
+
+
 def test(folder):
     # A deterministic three-minute audio source, long enough to exercise screen-off.
     with wave.open(str(Path(folder) / "radio.wav"), "wb") as media:
         media.setparams((1, 2, 8000, 0, "NONE", ""))
         media.writeframes(bytes(2 * 8000 * 180))
-    server = ThreadingHTTPServer(("127.0.0.1", 8791), partial(SimpleHTTPRequestHandler, directory=folder))
+    server = ThreadingHTTPServer(("127.0.0.1", 8791), partial(FixtureProxy, directory=folder))
     threading.Thread(target=server.serve_forever, daemon=True).start()
     apk, = Path("emulator-apk").rglob("*debug.apk")
     adb("install", "-r", str(apk))
@@ -84,7 +95,7 @@ def test(folder):
             raise AssertionError(result["exceptionDetails"])
         return result["result"].get("value")
     station = {"stationuuid":"screen-off-test","name":"Screen-off test","countrycode":"GB",
-               "url":"http://127.0.0.1:8791/radio.wav","url_resolved":"","hls":0,"codec":"PCM","language":""}
+               "url":"http://fixture.invalid/radio.wav","url_resolved":"","hls":0,"codec":"PCM","language":""}
     try:
         wait(lambda: evaluate("!!document.querySelector('#radioNav')?.onclick"))
     except AssertionError:
@@ -92,7 +103,7 @@ def test(folder):
         raise
     shutil.copyfile(Path(__file__).with_name("test-pattern.mp4"), Path(folder) / "test.mp4")
     channel = {"id": "pip-test", "name": "PiP test", "group": "央视", "region": "CN",
-               "logo": "", "epg_id": "", "routes": ["http://127.0.0.1:8791/test.mp4"]}
+               "logo": "", "epg_id": "", "routes": ["http://fixture.invalid/test.mp4"]}
     seed = {"radio-favorites": [[station["stationuuid"], station]],
             **{f"feed-{i}": {"channels": [channel] if i == 0 else [],
                              "updated": int(time.time() * 1000)} for i in range(3)}}
@@ -109,6 +120,18 @@ def test(folder):
         print("Fixture state:", evaluate("[location.href,document.readyState,window.__fixture,document.body?.innerText.slice(0,600)]"), file=sys.stderr)
         raise
     print("Test page ready:", evaluate("[location.href,document.querySelector('#now')?.innerText,localStorage.getItem('lastChannel')]"), flush=True)
+    evaluate("document.querySelector('#manage').click();document.querySelector('#dialog [data-act=proxy]').click()")
+    wait(lambda: evaluate("document.querySelector('#proxyForm [type=submit]')?.disabled===false"))
+    evaluate("""{
+        const f = document.querySelector('#proxyForm');
+        if (f.elements.mode) {
+          f.elements.mode.value='custom'; f.elements.mode.dispatchEvent(new Event('change'));
+        }
+        f.elements.address.value='http://127.0.0.1:8791';
+        f.elements.radioPlay.checked=f.elements.tvPlay.checked=true; f.requestSubmit();
+    }""")
+    wait(lambda: evaluate("document.querySelector('#proxyForm [role=status]').textContent.includes('已保存')"))
+    evaluate("document.querySelector('#close').click()")
     evaluate("document.querySelector('#radioNav').click();document.querySelector('#radioFavs').click()")
     wait(lambda: evaluate("!!document.querySelector('.radio-station')"))
     evaluate("document.querySelector('.radio-station').click()")
@@ -142,14 +165,11 @@ def test(folder):
     print("TV state:", evaluate("[document.querySelector('#now')?.innerText,document.querySelector('#channels')?.innerText.slice(0,240)]"), flush=True)
     evaluate("document.querySelector('#channels [data-i=pip-test]').click()")
     wait(lambda: evaluate("document.querySelector('.screen video').currentTime > 1"))
-    # Older test APKs can also cover radio and PiP before fullscreen was added.
-    has_fullscreen = evaluate("!!document.querySelector('#fullscreen')")
-    if has_fullscreen:
-        evaluate("document.querySelector('#fullscreen').click()")
-        wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
-        adb("shell", "input", "keyevent", "KEYCODE_BACK")
-        wait(lambda: evaluate("!document.body.classList.contains('cinema-mode')"))
-        print("Verified Android fullscreen and system Back.")
+    evaluate("document.querySelector('#fullscreen').click()")
+    wait(lambda: evaluate("document.body.classList.contains('cinema-mode')"))
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    wait(lambda: evaluate("!document.body.classList.contains('cinema-mode')"))
+    print("Verified Android fullscreen and system Back.", flush=True)
     evaluate("document.querySelector('#pip').click()")
     def pinned():
         return re.search(r"mode=pinned[^\n]*", adb("shell", "dumpsys", "activity", "activities")) is not None
