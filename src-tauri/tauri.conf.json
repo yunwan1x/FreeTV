@@ -1,10 +1,47 @@
 {
-  "$schema":"https://schema.tauri.app/config/2",
-  "productName":"FreeTV","version":"0.1.0","identifier":"app.freetv.player",
-  "build":{"beforeDevCommand":"npm run dev","devUrl":"http://127.0.0.1:5173","beforeBuildCommand":"npm run build","frontendDist":"../dist"},
-  "app":{"windows":[{"title":"FreeTV · 电视直播","width":1260,"height":840,"minWidth":360,"minHeight":540}],
-    "security":{"csp":"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src ipc: http://ipc.localhost https://ipc.localhost 'self'; media-src 'self' blob: https: http:; worker-src 'self' blob:"}},
-  "bundle":{"active":true,"icon":["icons/32x32.png","icons/128x128.png","icons/128x128@2x.png","icons/icon.icns","icons/icon.ico"],
-    "shortDescription":"FreeTV 电视直播播放器","category":"Entertainment",
-    "linux":{"deb":{"depends":["gstreamer1.0-plugins-good","gstreamer1.0-plugins-bad","gstreamer1.0-libav"]}}}
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FreeTV",
+  "version": "0.1.0",
+  "identifier": "app.freetv.player",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "FreeTV · 电视直播",
+        "width": 1260,
+        "height": 840,
+        "minWidth": 360,
+        "minHeight": 540
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src ipc: http://ipc.localhost https://ipc.localhost 'self'; media-src 'self' blob: https: http:; worker-src 'self' blob:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "FreeTV 电视直播播放器",
+    "category": "Entertainment",
+    "linux": {
+      "deb": {
+        "depends": [
+          "gstreamer1.0-plugins-good",
+          "gstreamer1.0-plugins-bad",
+          "gstreamer1.0-libav"
+        ]
+      }
+    }
+  }
 }
