@@ -1,6 +1,6 @@
 [package]
 name = "freetv-core"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 
 [dependencies]
@@ -11,3 +11,4 @@ regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots","rustls-tls-webpki-roots","gzip","stream"] }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["macros","rt-multi-thread","time","sync"] }
+serde_json = "1"

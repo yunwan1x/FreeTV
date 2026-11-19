@@ -16,6 +16,7 @@
           <div class="brand"><i class="logo"></i>FreeTV</div>
           <nav>
             <button id="home" class="active">电视直播</button
+            ><button id="radioNav">全球电台</button
             ><button id="schedule">节目单</button
             ><button id="favorites">我的收藏</button>
           </nav>
@@ -26,7 +27,7 @@
         /></label>
       </div>
     </header>
-    <main>
+    <main id="tvPage">
       <div class="between headline">
         <h1>电视直播</h1>
         <button class="textbtn" id="manage">频道订阅</button>
@@ -74,6 +75,52 @@
         <button id="notices">FreeTV · 开源许可</button
         ><span>频道来源　Free-TV / best-fan</span>
       </footer>
+    </main>
+    <main id="radioPage" hidden>
+      <section class="between headline">
+        <h1>全球电台</h1>
+        <button class="outline" id="radioFavs">电台收藏</button>
+      </section>
+      <section class="radio-tuner" aria-label="电台播放器">
+        <div>
+          <span id="radioStatus" role="status">选择电台开始收听</span>
+          <h2 id="radioName">尚未选台</h2>
+          <small id="radioMeta"></small>
+        </div>
+        <div class="row">
+          <button id="radioToggle" class="outline" disabled>播放</button
+          ><button id="radioStop" class="outline" disabled>停止</button>
+        </div>
+        <audio id="radioAudio" playsinline></audio>
+      </section>
+      <form id="radioFilters">
+        <input
+          name="name"
+          type="search"
+          placeholder="搜索电台名称"
+          aria-label="电台名称"
+        />
+        <input
+          name="country"
+          maxlength="2"
+          placeholder="国家或地区代码，如 CN"
+          aria-label="国家或地区代码"
+        />
+        <input
+          name="language"
+          placeholder="语言，如 english"
+          aria-label="语言"
+        />
+        <input name="tag" placeholder="类型，如 jazz" aria-label="类型" />
+        <button class="outline" type="submit">搜索</button>
+      </form>
+      <section class="section">
+        <h2 id="radioListTitle">热门电台</h2>
+        <p id="radioMessage" role="status"></p>
+        <div id="radioList"></div>
+        <button id="radioMore" class="outline" hidden>更多电台</button>
+      </section>
+      <footer>电台目录由 Radio Browser 提供</footer>
     </main>
     <dialog class="sheet" id="dialog">
       <div id="dialogBody" class="modalScroll"></div>

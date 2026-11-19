@@ -1,0 +1,11 @@
+{
+  "identifier": "android-radio",
+  "description": "Native radio player controls",
+  "windows": ["main"],
+  "platforms": ["android"],
+  "permissions": [
+    "radio:allow-start",
+    "radio:allow-control",
+    "radio:allow-status"
+  ]
+}

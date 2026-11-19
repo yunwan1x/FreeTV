@@ -15,6 +15,23 @@ struct Engine {
 }
 
 #[tauri::command]
+fn native_radio() -> bool {
+    cfg!(target_os = "android")
+}
+
+#[tauri::command]
+async fn radio_stations(
+    name: String,
+    country: String,
+    language: String,
+    tag: String,
+    offset: u32,
+    engine: State<'_, Engine>,
+) -> Result<freetv_core::radio::Page, String> {
+    freetv_core::radio::search(&engine.client, &name, &country, &language, &tag, offset).await
+}
+
+#[tauri::command]
 async fn subscription(
     source: usize,
     engine: State<'_, Engine>,
@@ -102,7 +119,10 @@ async fn media(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let client = network::client().expect("HTTP client initialization failed");
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(tauri_plugin_radio::init());
+    builder
         .manage(Engine {
             client,
             guides: Mutex::default(),
@@ -114,6 +134,8 @@ pub fn run() {
             deep_check::choose_ffmpeg,
             #[cfg(desktop)]
             deep_check::decode_route,
+            radio_stations,
+            native_radio,
             subscription,
             probe_route,
             programmes,

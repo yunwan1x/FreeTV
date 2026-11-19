@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { setupRadio } from "./radio.js";
 import { Player, previewFirstFrame } from "./player.js";
 import checkerNotice from "../licenses/iptv-checker-rs.txt?raw";
 import hlsNotice from "../node_modules/hls.js/LICENSE?raw";
@@ -93,6 +94,38 @@ const player = new Player($("video"), {
   },
 });
 
+const radio = setupRadio(read, write, () => {
+  if (activeUrl) {
+    player.stop();
+    activeUrl = "";
+    $("cover").hidden = false;
+    status("");
+  }
+});
+function showPage(isRadio) {
+  if (isRadio && !$("radioPage").hidden) return;
+  const wasRadio = !$("radioPage").hidden;
+  $("tvPage").hidden = isRadio;
+  $("radioPage").hidden = !isRadio;
+  $("search").parentElement.hidden = isRadio;
+  $("radioNav").classList.toggle("active", isRadio);
+  if (isRadio) {
+    if (activeUrl) {
+      player.stop();
+      activeUrl = "";
+      $("cover").hidden = false;
+      status("");
+    }
+    $("home").classList.remove("active");
+    $("favorites").classList.remove("active");
+    radio.open();
+  } else if (wasRadio) {
+    radio.close();
+    drawList();
+  }
+  write("radio-visible", isRadio);
+}
+$("radioNav").onclick = () => showPage(true);
 function orderedRoutes(channel, first) {
   const weight = (url) =>
     health.get(url)?.ms ?? (health.has(url) ? Infinity : 1e6);
@@ -186,8 +219,11 @@ function drawList() {
     : query
       ? "搜索结果"
       : "频道选择";
-  $("favorites").classList.toggle("active", favoritesOnly);
-  $("home").classList.toggle("active", !favoritesOnly);
+  $("favorites").classList.toggle(
+    "active",
+    favoritesOnly && $("radioPage").hidden,
+  );
+  $("home").classList.toggle("active", !favoritesOnly && $("radioPage").hidden);
   $("channels").innerHTML =
     items
       .slice(0, limit)
@@ -565,6 +601,7 @@ $("routes").onclick = () => {
       .catch((error) => status(String(error)));
 };
 $("home").onclick = () => {
+  showPage(false);
   favoritesOnly = false;
   query = "";
   $("search").value = "";
@@ -574,6 +611,7 @@ $("home").onclick = () => {
   drawList();
 };
 $("favorites").onclick = () => {
+  showPage(false);
   favoritesOnly = true;
   query = "";
   $("search").value = "";
@@ -581,7 +619,10 @@ $("favorites").onclick = () => {
   drawTabs();
   drawList();
 };
-$("schedule").onclick = () => $("guide").scrollIntoView({ block: "center" });
+$("schedule").onclick = () => {
+  showPage(false);
+  $("guide").scrollIntoView({ block: "center" });
+};
 $("save").onclick = () => {
   if (!current) return;
   if (favorites.has(current.id)) favorites.delete(current.id);
@@ -680,3 +721,5 @@ if (!isTauri()) {
   feeds.some((feed) => !feed || Date.now() - feed.updated > 6 * 3600 * 1000)
 )
   refresh();
+
+if (read("radio-visible", false)) showPage(true);

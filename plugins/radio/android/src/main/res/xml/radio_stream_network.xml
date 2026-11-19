@@ -1,0 +1,4 @@
+<network-security-config>
+    <!-- Many public stations publish an HTTP-only stream. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -67,7 +67,7 @@ export class Player {
     this.video.removeAttribute("src");
     this.video.load();
   }
-  play(urls) {
+  play(urls, format = "auto") {
     this.stop();
     const [url, ...rest] = urls;
     if (!url) {
@@ -77,7 +77,7 @@ export class Player {
     const token = this.generation;
     const current = () => token === this.generation;
     const fail = () => {
-      if (current()) this.play(rest);
+      if (current()) this.play(rest, format);
     };
     const watchdog = () => {
       clearTimeout(this.timer);
@@ -111,7 +111,10 @@ export class Player {
     };
     watchdog();
     const nativeFile = /\.(?:mp4|webm|og[gv])(?:[?#]|$)/i.test(url);
-    if (!nativeFile && Hls.isSupported()) {
+    if (
+      (format === "hls" || (format === "auto" && !nativeFile)) &&
+      Hls.isSupported()
+    ) {
       const h = new Hls({
         loader: MediaLoader,
         enableWorker: false,
