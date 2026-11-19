@@ -148,7 +148,11 @@ export function setupRadio(read, write, stopTV) {
       }
       if (version === playVersion)
         setState(
-          { pause: "paused", resume: "buffering", stop: "idle" }[action],
+          {
+            pause: "paused",
+            resume: native ? "buffering" : "playing",
+            stop: "idle",
+          }[action],
         );
       if (native && version === playVersion) await syncNative();
     } catch (error) {
