@@ -41,6 +41,7 @@ jobs:
         with:
           name: FreeTV-${{ matrix.platform }}
           path: target/release/bundle/${{ matrix.bundle }}/*.${{ matrix.extension }}
+          retention-days: 1
           if-no-files-found: error
   android:
     runs-on: ubuntu-24.04
@@ -49,7 +50,7 @@ jobs:
       - uses: actions/setup-node@v5
         with: {node-version: 22, cache: npm}
       - uses: actions/setup-java@v5
-        with: {distribution: temurin, java-version: '17'}
+        with: {distribution: temurin, java-version: '21'}
       - uses: dtolnay/rust-toolchain@stable
         with: {targets: aarch64-linux-android}
       - uses: Swatinem/rust-cache@v2
@@ -57,9 +58,10 @@ jobs:
       - run: npm ci
       - name: Install Android build tools
         run: |
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;27.2.12479018' 'platforms;android-36' 'build-tools;36.0.0'
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'ndk;27.2.12479018' 'platforms;android-36' 'platforms;android-37.0' 'build-tools;36.0.0'
           echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
       - name: Generate native project and build APK
+        shell: bash
         run: |
           # buildSrc resolves the Kotlin DSL plugin through the Plugin Portal.
           # Resolve its published Kotlin libraries directly from Maven Central.
@@ -76,7 +78,10 @@ jobs:
           GRADLE
           npm run tauri -- android init --ci --skip-targets-install
           npm run tauri -- icon assets/icon.svg
-          npm run tauri -- android build --ci --apk --target aarch64
+          if ! npm run tauri -- android build --ci --apk --target aarch64 2>&1 | tee "$RUNNER_TEMP/android-build.log"; then
+            awk '/^\* What went wrong:/ { report=1; next } /^\* Try:/ { report=0 } /^error(\[|:)|^e: / || report { if (length($0) && length($0) < 800) print "::error::" $0 }' "$RUNNER_TEMP/android-build.log"
+            exit 1
+          fi
       - name: Sign and verify APK
         env:
           RELEASE_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -109,6 +114,7 @@ jobs:
         with:
           name: FreeTV-android-arm64
           path: artifacts/*.apk
+          retention-days: 1
           if-no-files-found: error
       - name: Build Android emulator test APK
         if: inputs.verify_radio_lock
@@ -120,6 +126,7 @@ jobs:
         with:
           name: radio-emulator-apk
           path: src-tauri/gen/android/app/build/outputs/apk/**/debug/*debug.apk
+          retention-days: 1
           if-no-files-found: error
   radio-lock-test:
     if: inputs.verify_radio_lock
@@ -130,31 +137,18 @@ jobs:
     uses: ./.github/workflows/android-playback-test.yml
     with:
       run_id: ${{ format('{0}', github.run_id) }}
-  release-assets:
+  source-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [desktop, android]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: FreeTV-*
-          path: installers
-      - name: Stage installers in a release draft
+      - name: Prepare source release draft
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        shell: bash
         run: |
-          set -euo pipefail
-          # Publication is a separate step after the four assets are verified.
           if ! gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null; then
             gh release create "$TAG" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "FreeTV ${TAG#v}" --generate-notes
           fi
-          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft | grep -qx true
-          shopt -s nullglob
-          files=(installers/FreeTV-windows-x64/*.exe installers/FreeTV-macos-arm64/*.dmg installers/FreeTV-linux-x64/*.deb installers/FreeTV-android-arm64/*.apk)
-          test "${#files[@]}" -eq 4
-          gh release upload "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
-          sha256sum "${files[@]}"
